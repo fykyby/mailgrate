@@ -22,7 +22,7 @@ func InitJobQueue() {
 	jobQueueSizeStr := os.Getenv("JOB_QUEUE_SIZE")
 	jobQueueSize, err := strconv.Atoi(jobQueueSizeStr)
 	if err != nil || jobQueueSize < 0 {
-		slog.Error(err.Error())
+		slog.Error("invalid job queue size: " + err.Error())
 		return
 	} else if jobQueueSize == 0 {
 		return
