@@ -1,0 +1,11 @@
+package pages
+
+import "app/templates/layouts"
+
+templ Home() {
+	@layouts.Base(layouts.BaseProps{
+		Title: "Home",
+	}) {
+		<h1>Home</h1>
+	}
+}

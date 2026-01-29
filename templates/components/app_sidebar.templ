@@ -1,0 +1,104 @@
+package components
+
+import (
+	"app/templates/components/dropdown"
+	"app/templates/components/icon"
+	"app/templates/components/sidebar"
+	"app/templates/utils"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+	"os"
+)
+
+templ AppSidebar() {
+	{{ userData := utils.GetUserData(ctx) }}
+	@sidebar.Layout() {
+		@sidebar.Sidebar(sidebar.Props{
+			Collapsible: sidebar.CollapsibleNone,
+		}) {
+			@sidebar.Header(sidebar.HeaderProps{
+				Class: "flex-row p-2 items-center md:hidden",
+			}) {
+				@sidebar.Trigger()
+			}
+			@sidebar.Content() {
+				@sidebar.Group() {
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@sidebar.MenuItem() {
+								@sidebar.MenuButton(sidebar.MenuButtonProps{
+									Href: "/",
+								}) {
+									<span class="font-semibold text-center w-full">
+										{ cases.Title(language.Und).String(os.Getenv("APP_NAME")) }
+									</span>
+								}
+							}
+						}
+					}
+				}
+				@sidebar.Separator(sidebar.SeparatorProps{
+					Class: "mb-0 -mt-1",
+				})
+				@sidebar.Group() {
+					@sidebar.GroupLabel() {
+						App
+					}
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Href: "/app",
+							}) {
+								@icon.LayoutDashboard(icon.Props{Class: "size-4"})
+								<span>Dashboard</span>
+							}
+						}
+					}
+				}
+			}
+			@sidebar.Separator(sidebar.SeparatorProps{
+				Class: "my-0",
+			})
+			@sidebar.Footer() {
+				@sidebar.Menu() {
+					@sidebar.MenuItem() {
+						@dropdown.Dropdown() {
+							@dropdown.Trigger() {
+								@sidebar.MenuButton(sidebar.MenuButtonProps{
+									Size: sidebar.MenuButtonSizeDefault,
+								}) {
+									@icon.User(icon.Props{Size: 16, Class: "mr-2"})
+									<div class="grid flex-1 text-sm leading-tight">
+										<span class="truncate text-xs">
+											{ userData.Email }
+										</span>
+									</div>
+									@icon.ChevronsUpDown(icon.Props{Class: "ml-auto size-4"})
+								}
+							}
+							@dropdown.Content(dropdown.ContentProps{
+								Class:     "w-56",
+								Placement: dropdown.PlacementTop,
+							}) {
+								@dropdown.Item(dropdown.ItemProps{
+									Attributes: templ.Attributes{
+										"hx-post": "/log-out",
+										"hx-swap": "none",
+									},
+								}) {
+									<span class="flex items-center">
+										@icon.LogOut(icon.Props{Size: 16, Class: "mr-2"})
+										Log out
+									</span>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		@sidebar.Inset() {
+			{ children... }
+		}
+	}
+}

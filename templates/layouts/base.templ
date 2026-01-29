@@ -1,0 +1,74 @@
+package layouts
+
+import (
+	"app/templates/components/button"
+	"app/templates/components/input"
+	"app/templates/components/label"
+	"app/templates/utils"
+	"os"
+)
+
+type BaseProps struct {
+	Title string
+}
+
+templ Base(props BaseProps) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ props.Title } - { os.Getenv("APP_NAME") }</title>
+			<link rel="stylesheet" href="/static/css/out.css"/>
+			<script defer src="/static/js/htmx.min.js"></script>
+			<script defer src="/static/js/app.js"></script>
+			@input.Script()
+			@label.Script()
+		</head>
+		<body class="dark" hx-boost="true">
+			<header class="border-b">
+				<nav class="max-w-lg w-full mx-auto justify-center items-center py-2 px-4 flex gap-2">
+					@button.Button(button.Props{
+						Variant: button.VariantGhost,
+						Href:    "/",
+					}) {
+						Home
+					}
+					if utils.GetUserData(ctx) == nil {
+						@button.Button(button.Props{
+							Variant: button.VariantGhost,
+							Href:    "/sign-up",
+						}) {
+							Sign Up
+						}
+						@button.Button(button.Props{
+							Variant: button.VariantGhost,
+							Href:    "/log-in",
+						}) {
+							Log In
+						}
+					} else {
+						@button.Button(button.Props{
+							Variant: button.VariantGhost,
+							Href:    "/app",
+						}) {
+							Dashboard
+						}
+						@button.Button(button.Props{
+							Variant: button.VariantGhost,
+							Attributes: templ.Attributes{
+								"hx-post": "/log-out",
+								"hx-swap": "none",
+							},
+						}) {
+							Log Out
+						}
+					}
+				</nav>
+			</header>
+			<main class="max-w-lg w-full mx-auto p-6 flex flex-col gap-6">
+				{ children... }
+			</main>
+		</body>
+	</html>
+}

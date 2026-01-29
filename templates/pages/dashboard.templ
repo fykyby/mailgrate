@@ -1,0 +1,11 @@
+package pages
+
+import "app/templates/layouts"
+
+templ Dashboard() {
+	@layouts.App(layouts.AppProps{
+		Title: "Dashboard",
+	}) {
+		<h1>Dashboard</h1>
+	}
+}

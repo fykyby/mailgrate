@@ -1,0 +1,31 @@
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile.dev
+        command: sh -c "air -c .air.toml"
+        ports:
+            - ${PORT}:${PORT}
+        volumes:
+            - ./:/app
+        depends_on:
+            postgres:
+                condition: service_healthy
+    postgres:
+        image: postgres:17
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres-data:/var/lib/postgresql/data
+        environment:
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: admin
+            POSTGRES_DB: database
+        healthcheck:
+            test: "pg_isready -U admin -d database"
+            interval: 2s
+            timeout: 5s
+            retries: 10
+volumes:
+    postgres-data:
+        driver: local

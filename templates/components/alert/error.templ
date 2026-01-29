@@ -1,0 +1,17 @@
+package alert
+
+import "app/templates/components/icon"
+
+templ Error(message string) {
+	@Alert(Props{
+		Variant: VariantDestructive,
+		ID:      "error"}) {
+		@icon.TriangleAlert()
+		@Title() {
+			Error
+		}
+		@Description() {
+			{ message }
+		}
+	}
+}
