@@ -24,7 +24,7 @@ func main() {
 
 	e := echo.NewWithConfig(echo.Config{
 		Filesystem: efs.StaticFS,
-		Validator:  app.NewValidator(),
+		Validator:  httpx.NewValidator(),
 		Logger:     slog.Default(),
 		Binder:     &echo.DefaultBinder{},
 	})
