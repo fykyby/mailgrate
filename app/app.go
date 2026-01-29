@@ -4,10 +4,12 @@ import (
 	"app/worker"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -15,7 +17,7 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-func Start(e *echo.Echo, workerCount int) error {
+func Start(e *echo.Echo) error {
 	sigCtx, sigCancel := signal.NotifyContext(
 		context.Background(),
 		syscall.SIGINT,
@@ -26,6 +28,12 @@ func Start(e *echo.Echo, workerCount int) error {
 	// start workers
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
+
+	workerCountStr := os.Getenv("WORKER_COUNT")
+	workerCount, err := strconv.Atoi(workerCountStr)
+	if err != nil {
+		return fmt.Errorf("invalid worker count: %w", err)
+	}
 
 	var workerWg sync.WaitGroup
 	for range workerCount {

@@ -34,7 +34,7 @@ func main() {
 	app.RegisterMiddleware(e)
 	app.RegisterRoutes(e)
 
-	if err := app.Start(e, 0); err != nil {
+	if err := app.Start(e); err != nil {
 		slog.Error(err.Error())
 	}
 }
