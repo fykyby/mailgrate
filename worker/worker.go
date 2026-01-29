@@ -18,17 +18,17 @@ var jobs = make(chan Job, 64)
 
 func StartWorker(ctx context.Context) {
 	workerCount++
-	slog.Info(fmt.Sprintf("worker %d: started", workerCount))
+	slog.Info("worker: started")
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info(fmt.Sprintf("worker %d: stopped", workerCount))
+			slog.Info("worker: stopped")
 			workerCount--
 			return
 		case job := <-jobs:
-			slog.Info(fmt.Sprintf("worker %d: starting job %s", workerCount, job.ID()))
+			slog.Info(fmt.Sprintf("worker: starting job %s", job.ID()))
 			job.Run(ctx)
-			slog.Info(fmt.Sprintf("worker %d: job %s completed", workerCount, job.ID()))
+			slog.Info(fmt.Sprintf("worker: job %s completed", job.ID()))
 		}
 	}
 }
