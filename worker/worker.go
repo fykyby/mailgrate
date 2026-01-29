@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"strconv"
 )
 
 type Job interface {
@@ -14,7 +16,20 @@ type Job interface {
 }
 
 var workerCount = 0
-var jobs = make(chan Job, 64)
+var jobs chan Job
+
+func InitJobQueue() {
+	jobQueueSizeStr := os.Getenv("JOB_QUEUE_SIZE")
+	jobQueueSize, err := strconv.Atoi(jobQueueSizeStr)
+	if err != nil || jobQueueSize < 0 {
+		slog.Error(err.Error())
+		return
+	} else if jobQueueSize == 0 {
+		return
+	}
+
+	jobs = make(chan Job, jobQueueSize)
+}
 
 func StartWorker(ctx context.Context) {
 	workerCount++
@@ -28,13 +43,13 @@ func StartWorker(ctx context.Context) {
 		case job := <-jobs:
 			slog.Info(fmt.Sprintf("worker: starting job %s", job.ID()))
 			job.Run(ctx)
-			slog.Info(fmt.Sprintf("worker: job %s completed", job.ID()))
+			slog.Info(fmt.Sprintf("worker: completed job %s", job.ID()))
 		}
 	}
 }
 
 func AddJob(job Job) error {
-	if workerCount == 0 {
+	if workerCount == 0 || cap(jobs) <= 0 {
 		return errors.New(httpx.MsgErrWorkersUnavailable)
 	}
 

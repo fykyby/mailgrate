@@ -29,6 +29,8 @@ func Start(e *echo.Echo) error {
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 
+	worker.InitJobQueue()
+
 	workerCountStr := os.Getenv("WORKER_COUNT")
 	workerCount, err := strconv.Atoi(workerCountStr)
 	if err != nil {
@@ -38,7 +40,6 @@ func Start(e *echo.Echo) error {
 	var workerWg sync.WaitGroup
 	for range workerCount {
 		workerWg.Go(func() {
-			slog.Info("starting worker")
 			worker.StartWorker(workerCtx)
 		})
 	}
