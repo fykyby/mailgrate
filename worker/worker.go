@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"app/config"
 	"app/data"
 	"app/errorsx"
 	"context"
@@ -10,6 +9,8 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+
+	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 type JobHandler interface {
@@ -22,19 +23,16 @@ func RegisterJob(jobType data.JobType, job JobHandler) {
 	jobRegistry[jobType] = job
 }
 
-func StartWorker(ctx context.Context) {
+func StartWorker(ctx context.Context, notifyChan <-chan pgdriver.Notification) {
 	slog.Info("worker: started")
-
-	ticker := time.NewTicker(time.Second * time.Duration(config.Config.WorkerPollIntervalSeconds))
-	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			slog.Info("worker: stopped accepting jobs")
 			return
-		case <-ticker.C:
-			slog.Debug("worker: looking for job")
+		case notification := <-notifyChan:
+			slog.Debug("worker: received notification", "notification", notification)
 			job, err := data.FindPendingJob(ctx)
 			if err != nil {
 				if !errorsx.IsNotFoundError(err) {

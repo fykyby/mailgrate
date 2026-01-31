@@ -2,6 +2,7 @@ package app
 
 import (
 	"app/config"
+	"app/db"
 	"app/worker"
 	"context"
 	"errors"
@@ -14,9 +15,21 @@ import (
 	"syscall"
 
 	"github.com/labstack/echo/v5"
+	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 func Start(e *echo.Echo) error {
+	loggerOptions := &slog.HandlerOptions{}
+
+	if config.Config.IsDev {
+		loggerOptions.Level = slog.LevelDebug
+	} else {
+		loggerOptions.Level = slog.LevelInfo
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, loggerOptions))
+	slog.SetDefault(logger)
+
 	sigCtx, sigCancel := signal.NotifyContext(
 		context.Background(),
 		os.Interrupt,
@@ -28,10 +41,28 @@ func Start(e *echo.Echo) error {
 	// start workers
 	workerCtx, stopWorkerCtx := context.WithCancel(context.Background())
 	var workerWg sync.WaitGroup
+
+	ln := pgdriver.NewListener(db.Bun)
+	err := ln.Listen(workerCtx, "jobs:updated")
+	if err != nil {
+		slog.Error("failed to listen for jobs:updated", "error", err)
+		stopWorkerCtx()
+		return err
+	}
+	defer ln.Close()
+
 	for range config.Config.WorkerCount {
 		workerWg.Go(func() {
-			worker.StartWorker(workerCtx)
+			worker.StartWorker(workerCtx, ln.Channel())
 		})
+	}
+
+	err = pgdriver.Notify(workerCtx, db.Bun, "jobs:updated", "")
+	if err != nil {
+		slog.Error("failed to notify jobs:updated", "error", err)
+		stopWorkerCtx()
+		workerWg.Wait()
+		return err
 	}
 
 	slog.Info("http://localhost:" + strconv.Itoa(config.Config.Port))

@@ -12,9 +12,28 @@ CREATE TABLE jobs (
   FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
+CREATE FUNCTION notify_job_update () RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status IN ('pending', 'paused') THEN
+    PERFORM pg_notify('jobs:updated', NEW.id::text);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER jobs_after_update_trigger
+AFTER INSERT
+OR
+UPDATE ON jobs FOR EACH ROW
+EXECUTE PROCEDURE notify_job_update ();
+
 -- +goose StatementEnd
 -- +goose Down
 -- +goose StatementBegin
-DROP TABLE jobs;
+DROP TRIGGER IF EXISTS jobs_after_update_trigger ON jobs;
+
+DROP FUNCTION IF EXISTS notify_job_update ();
+
+DROP TABLE IF EXISTS jobs;
 
 -- +goose StatementEnd
