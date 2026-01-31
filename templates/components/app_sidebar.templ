@@ -1,13 +1,13 @@
 package components
 
 import (
+	"app/config"
 	"app/templates/components/dropdown"
 	"app/templates/components/icon"
 	"app/templates/components/sidebar"
 	"app/templates/utils"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"os"
 )
 
 templ AppSidebar() {
@@ -30,7 +30,7 @@ templ AppSidebar() {
 									Href: "/",
 								}) {
 									<span class="font-semibold text-center w-full">
-										{ cases.Title(language.Und).String(os.Getenv("APP_NAME")) }
+										{ cases.Title(language.Und).String(config.Config.AppName) }
 									</span>
 								}
 							}

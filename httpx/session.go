@@ -1,9 +1,9 @@
 package httpx
 
 import (
+	"app/config"
 	"encoding/gob"
 	"net/http"
-	"os"
 
 	"github.com/antonlindstrom/pgstore"
 	"github.com/gorilla/sessions"
@@ -23,7 +23,7 @@ type UserSessionData struct {
 var SessionStore *pgstore.PGStore
 
 func InitPostgresSessionStore() {
-	store, err := pgstore.NewPGStore(os.Getenv("DB_URI"), []byte(os.Getenv("APP_KEY")))
+	store, err := pgstore.NewPGStore(config.Config.DbUri, []byte(config.Config.AppKey))
 	if err != nil {
 		panic(err)
 	}
@@ -32,7 +32,7 @@ func InitPostgresSessionStore() {
 		Path:     "/",
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
-		Secure:   os.Getenv("ENV") != "dev",
+		Secure:   !config.Config.IsDev,
 		SameSite: http.SameSiteLaxMode,
 	}
 

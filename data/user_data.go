@@ -3,6 +3,7 @@ package data
 import (
 	"app/db"
 	"context"
+	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -10,9 +11,10 @@ import (
 type User struct {
 	bun.BaseModel `bun:"table:users"`
 
-	ID       int `bun:",pk,autoincrement"`
-	Email    string
-	Password string
+	ID        int `bun:",pk,autoincrement"`
+	Email     string
+	Password  string
+	CreatedAt time.Time `bun:",nullzero,default:current_timestamp"`
 }
 
 func CreateUser(ctx context.Context, email string, password string) (*User, error) {

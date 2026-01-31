@@ -1,10 +1,10 @@
 package app
 
 import (
+	"app/config"
 	"app/worker"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/labstack/echo/v5"
 )
@@ -20,50 +19,45 @@ import (
 func Start(e *echo.Echo) error {
 	sigCtx, sigCancel := signal.NotifyContext(
 		context.Background(),
+		os.Interrupt,
 		syscall.SIGINT,
 		syscall.SIGTERM,
 	)
 	defer sigCancel()
 
 	// start workers
-	workerCtx, workerCancel := context.WithCancel(context.Background())
-	defer workerCancel()
-
-	worker.InitJobQueue()
-
-	workerCountStr := os.Getenv("WORKER_COUNT")
-	workerCount, err := strconv.Atoi(workerCountStr)
-	if err != nil {
-		return fmt.Errorf("invalid worker count: %w", err)
-	}
-
+	workerCtx, stopWorkerCtx := context.WithCancel(context.Background())
 	var workerWg sync.WaitGroup
-	for range workerCount {
+	for range config.Config.WorkerCount {
 		workerWg.Go(func() {
 			worker.StartWorker(workerCtx)
 		})
 	}
 
-	slog.Info("http://localhost:" + os.Getenv("PORT"))
+	slog.Info("http://localhost:" + strconv.Itoa(config.Config.Port))
 
 	// start server
+	serverErrCh := make(chan error, 1)
 	go func() {
-		sc := echo.StartConfig{
-			Address:         "0.0.0.0:" + os.Getenv("PORT"),
-			GracefulTimeout: 10 * time.Second,
-		}
-		if err := sc.Start(sigCtx, e); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error(err.Error())
-			workerCancel()
-		}
+		serverErrCh <- e.Start("0.0.0.0:" + strconv.Itoa(config.Config.Port))
 	}()
 
 	// wait for shutdown signal
-	<-sigCtx.Done()
-	slog.Info("shutdown signal received")
+	select {
+	case <-sigCtx.Done():
+		slog.Info("shutdown signal received")
+	case err := <-serverErrCh:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("server error: " + err.Error())
+		}
+		slog.Info("server exited, initiating shutdown")
+	}
 
-	// stop and wait for workers
-	workerCancel()
+	// stop accepting new jobs
+	stopWorkerCtx()
+
+	// wait for workers to finish running jobs
+	slog.Info("waiting for workers to finish jobs...")
 	workerWg.Wait()
 
 	return nil

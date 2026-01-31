@@ -2,6 +2,7 @@ package db
 
 import (
 	efs "app"
+	"app/config"
 	"database/sql"
 	"log/slog"
 	"os"
@@ -16,7 +17,7 @@ import (
 var Bun *bun.DB
 
 func InitPostgresDatabase() {
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(os.Getenv("DB_URI"))))
+	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.Config.DbUri)))
 	Bun = bun.NewDB(sqldb, pgdialect.New())
 
 	if os.Getenv("ENV") != "dev" {

@@ -1,11 +1,11 @@
 package layouts
 
 import (
+	"app/config"
 	"app/templates/components/button"
 	"app/templates/components/input"
 	"app/templates/components/label"
 	"app/templates/utils"
-	"os"
 )
 
 type BaseProps struct {
@@ -18,7 +18,7 @@ templ Base(props BaseProps) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>{ props.Title } - { os.Getenv("APP_NAME") }</title>
+			<title>{ props.Title } - { config.Config.AppName }</title>
 			<link rel="stylesheet" href="/static/css/out.css"/>
 			<script defer src="/static/js/htmx.min.js"></script>
 			<script defer src="/static/js/app.js"></script>

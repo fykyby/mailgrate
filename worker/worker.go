@@ -1,62 +1,108 @@
 package worker
 
 import (
-	"app/httpx"
+	"app/config"
+	"app/data"
+	"app/errorsx"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"strconv"
+	"time"
 )
 
-type Job interface {
-	ID() string
-	Run(ctx context.Context)
+type WorkerJob struct {
+	Type string
+	Run  func(ctx context.Context, payload json.RawMessage) (json.RawMessage, error)
 }
 
-var workerCount = 0
-var jobs chan Job
+var jobRegistry = make(map[string]*WorkerJob)
 
-func InitJobQueue() {
-	jobQueueSizeStr := os.Getenv("JOB_QUEUE_SIZE")
-	jobQueueSize, err := strconv.Atoi(jobQueueSizeStr)
-	if err != nil || jobQueueSize < 0 {
-		slog.Error("invalid job queue size: " + err.Error())
-		return
-	} else if jobQueueSize == 0 {
-		return
-	}
-
-	jobs = make(chan Job, jobQueueSize)
+func RegisterJob(job *WorkerJob) {
+	jobRegistry[job.Type] = job
 }
 
 func StartWorker(ctx context.Context) {
-	workerCount++
 	slog.Info("worker: started")
+
+	ticker := time.NewTicker(time.Second * time.Duration(config.Config.WorkerPollIntervalSeconds))
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("worker: stopped")
-			workerCount--
+			slog.Info("worker: stopped accepting jobs")
 			return
-		case job := <-jobs:
-			slog.Info(fmt.Sprintf("worker: starting job %s", job.ID()))
-			job.Run(ctx)
-			slog.Info(fmt.Sprintf("worker: completed job %s", job.ID()))
+		case <-ticker.C:
+			slog.Info("worker: looking for job")
+			job, err := data.FindPendingJob(ctx)
+			if err != nil {
+				if !errorsx.IsNotFoundError(err) {
+					slog.Error("worker: failed to find job", "error", err)
+				}
+				continue
+			}
+
+			slog.Info("worker: starting job", "job", job.ID)
+			runJob(ctx, job)
+			slog.Info("worker: finished job", "job", job.ID)
 		}
 	}
 }
 
-func AddJob(job Job) error {
-	if workerCount == 0 || cap(jobs) <= 0 {
-		return errors.New(httpx.MsgErrWorkersUnavailable)
+func runJob(ctx context.Context, job *data.Job) error {
+	handler, ok := jobRegistry[job.Type]
+	if !ok {
+		return fmt.Errorf("invalid job type: %s", job.Type)
 	}
 
-	select {
-	case jobs <- job:
-		return nil
-	default:
-		return errors.New(httpx.MsgErrJobQueueFull)
+	// Mark job as running
+	if err := updateJobStatus(ctx, job.ID, data.JobStatusRunning, nil); err != nil {
+		return err
 	}
+
+	// Run the job
+	payload, err := handler.Run(ctx, job.Payload)
+	if err != nil {
+		return handleJobError(ctx, job.ID, err, payload)
+	}
+
+	// Mark job as completed
+	return updateJobStatus(ctx, job.ID, data.JobStatusCompleted, payload)
+}
+
+func updateJobStatus(ctx context.Context, jobID int, status data.JobStatus, payload json.RawMessage) error {
+	update := &data.Job{
+		ID:      jobID,
+		Status:  status,
+		Payload: payload,
+	}
+
+	switch status {
+	case data.JobStatusRunning:
+		update.StartedAt = time.Now()
+	case data.JobStatusCompleted, data.JobStatusFailed:
+		update.FinishedAt = time.Now()
+	}
+
+	_, err := data.UpdateJob(ctx, update)
+	if err != nil {
+		slog.Error("worker: failed to update job status", "error", err.Error())
+	}
+	return err
+}
+
+func handleJobError(ctx context.Context, jobID int, err error, payload json.RawMessage) error {
+	if errors.Is(err, context.Canceled) {
+		slog.Info("worker: job canceled")
+		if e := updateJobStatus(ctx, jobID, data.JobStatusPaused, payload); e != nil {
+			return e
+		}
+		return nil
+	}
+
+	slog.Error("worker: failed to run job", "error", err.Error())
+	updateJobStatus(ctx, jobID, data.JobStatusFailed, payload)
+	return err
 }

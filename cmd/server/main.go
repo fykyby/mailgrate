@@ -3,17 +3,17 @@ package main
 import (
 	efs "app"
 	"app/app"
+	"app/config"
 	"app/db"
 	"app/httpx"
 	"log/slog"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v5"
 )
 
 func main() {
-	godotenv.Load()
+	config.InitConfig()
 
 	db.InitPostgresDatabase()
 	defer db.Bun.Close()
@@ -33,6 +33,7 @@ func main() {
 
 	app.RegisterMiddleware(e)
 	app.RegisterRoutes(e)
+	app.RegisterJobs()
 
 	if err := app.Start(e); err != nil {
 		slog.Error(err.Error())
