@@ -1,9 +1,12 @@
 package app
 
 import (
+	"app/data"
 	"app/handlers"
 	"app/httpx"
+	"app/jobs"
 	"app/templates/pages"
+	"encoding/json"
 
 	middlewarex "app/middleware"
 
@@ -29,5 +32,21 @@ func RegisterRoutes(e *echo.Echo) {
 	ar.POST("/log-out", handlers.UserLogOut)
 	ar.GET("/app", func(c *echo.Context) error {
 		return httpx.Render(c, 200, pages.Dashboard())
+	})
+
+	ar.GET("/job", func(c *echo.Context) error {
+		jobHandler := jobs.NewExampleJob()
+
+		payload, err := json.Marshal(jobHandler)
+		if err != nil {
+			return err
+		}
+
+		_, err = data.CreateJob(c.Request().Context(), httpx.GetUserSessionData(c).ID, jobs.ExampleJobType, payload)
+		if err != nil {
+			return err
+		}
+
+		return c.String(200, "ok")
 	})
 }

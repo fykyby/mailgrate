@@ -12,15 +12,14 @@ import (
 	"time"
 )
 
-type WorkerJob struct {
-	Type string
-	Run  func(ctx context.Context, payload json.RawMessage) (json.RawMessage, error)
+type JobHandler interface {
+	Run(ctx context.Context) error
 }
 
-var jobRegistry = make(map[string]*WorkerJob)
+var jobRegistry = make(map[data.JobType]JobHandler)
 
-func RegisterJob(job *WorkerJob) {
-	jobRegistry[job.Type] = job
+func RegisterJob(jobType data.JobType, job JobHandler) {
+	jobRegistry[jobType] = job
 }
 
 func StartWorker(ctx context.Context) {
@@ -35,7 +34,7 @@ func StartWorker(ctx context.Context) {
 			slog.Info("worker: stopped accepting jobs")
 			return
 		case <-ticker.C:
-			slog.Info("worker: looking for job")
+			slog.Debug("worker: looking for job")
 			job, err := data.FindPendingJob(ctx)
 			if err != nil {
 				if !errorsx.IsNotFoundError(err) {
@@ -54,55 +53,67 @@ func StartWorker(ctx context.Context) {
 func runJob(ctx context.Context, job *data.Job) error {
 	handler, ok := jobRegistry[job.Type]
 	if !ok {
-		return fmt.Errorf("invalid job type: %s", job.Type)
+		err := fmt.Errorf("worker: job type not found: %s", job.Type)
+		slog.Error("worker: job type not found", "error", err.Error())
+		return err
+	}
+
+	err := json.Unmarshal(job.Payload, handler)
+	if err != nil {
+		slog.Error("worker: failed to unmarshal job payload", "error", err.Error())
+		return err
 	}
 
 	// Mark job as running
-	if err := updateJobStatus(ctx, job.ID, data.JobStatusRunning, nil); err != nil {
+	job.Status = data.JobStatusRunning
+	job.StartedAt = time.Now()
+	err = updateJob(ctx, job, handler)
+	if err != nil {
 		return err
 	}
 
 	// Run the job
-	payload, err := handler.Run(ctx, job.Payload)
-	if err != nil {
-		return handleJobError(ctx, job.ID, err, payload)
+	err = handler.Run(ctx)
+	if err != nil && errors.Is(err, context.Canceled) {
+		job.Status = data.JobStatusPaused
+		err = updateJob(ctx, job, handler)
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		job.Status = data.JobStatusFailed
+		job.FinishedAt = time.Now()
+		err = updateJob(ctx, job, handler)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Mark job as completed
-	return updateJobStatus(ctx, job.ID, data.JobStatusCompleted, payload)
-}
-
-func updateJobStatus(ctx context.Context, jobID int, status data.JobStatus, payload json.RawMessage) error {
-	update := &data.Job{
-		ID:      jobID,
-		Status:  status,
-		Payload: payload,
-	}
-
-	switch status {
-	case data.JobStatusRunning:
-		update.StartedAt = time.Now()
-	case data.JobStatusCompleted, data.JobStatusFailed:
-		update.FinishedAt = time.Now()
-	}
-
-	_, err := data.UpdateJob(ctx, update)
+	job.Status = data.JobStatusCompleted
+	job.FinishedAt = time.Now()
+	err = updateJob(ctx, job, handler)
 	if err != nil {
-		slog.Error("worker: failed to update job status", "error", err.Error())
+		return err
 	}
-	return err
+
+	return nil
 }
 
-func handleJobError(ctx context.Context, jobID int, err error, payload json.RawMessage) error {
-	if errors.Is(err, context.Canceled) {
-		slog.Info("worker: job canceled")
-		if e := updateJobStatus(ctx, jobID, data.JobStatusPaused, payload); e != nil {
-			return e
-		}
-		return nil
+func updateJob(ctx context.Context, job *data.Job, handler JobHandler) error {
+	payload, err := json.Marshal(handler)
+	if err != nil {
+		slog.Error("worker: failed to marshal job handler", "error", err.Error())
+		return err
 	}
 
-	slog.Error("worker: failed to run job", "error", err.Error())
-	updateJobStatus(ctx, jobID, data.JobStatusFailed, payload)
-	return err
+	job.Payload = payload
+
+	_, err = data.UpdateJob(ctx, job)
+	if err != nil {
+		slog.Error("worker: failed to update job", "error", err.Error())
+		return err
+	}
+
+	return nil
 }

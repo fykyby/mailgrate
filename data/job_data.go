@@ -9,6 +9,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
+type JobType string
+
 type JobStatus string
 
 const (
@@ -24,7 +26,7 @@ type Job struct {
 
 	ID         int `bun:",pk,autoincrement"`
 	UserID     int
-	Type       string
+	Type       JobType
 	Status     JobStatus
 	Payload    json.RawMessage `bun:"type:jsonb"`
 	CreatedAt  time.Time       `bun:",nullzero,default:current_timestamp"`
@@ -32,7 +34,7 @@ type Job struct {
 	FinishedAt time.Time       `bun:",nullzero"`
 }
 
-func CreateJob(ctx context.Context, userID int, jobType string, payload json.RawMessage) (*Job, error) {
+func CreateJob(ctx context.Context, userID int, jobType JobType, payload json.RawMessage) (*Job, error) {
 	job := &Job{
 		UserID:  userID,
 		Type:    jobType,
