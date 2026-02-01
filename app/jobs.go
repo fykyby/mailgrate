@@ -1,5 +1,7 @@
 package app
 
 func RegisterJobs() {
-	// worker.RegisterJob(jobs.ExampleJobType, jobs.NewExampleJob())
+	// worker.RegisterJob(jobs.ExampleType, func() worker.JobHandler {
+	// 	return jobs.NewExample()
+	// })
 }

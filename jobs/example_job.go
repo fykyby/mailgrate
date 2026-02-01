@@ -1,33 +1,42 @@
 package jobs
 
 import (
-	"app/data"
+	"app/models"
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 )
 
-var ExampleJobType data.JobType = "example_job"
+var ExampleType models.JobType = "example"
 
-type ExampleJob struct {
+type Example struct {
 	Count int
 }
 
-func NewExampleJob() *ExampleJob {
-	return &ExampleJob{
+func NewExample() *Example {
+	return &Example{
 		Count: 0,
 	}
 }
 
-func (j *ExampleJob) Run(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
+func (j *Example) Run(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 
-	j.Count++
-	slog.Info(fmt.Sprintf("count: %d", j.Count))
+		j.Count++
+		slog.Info(fmt.Sprintf("count: %d", j.Count))
+
+		time.Sleep(time.Second)
+
+		if j.Count >= 20 {
+			break
+		}
+	}
 
 	return nil
 }

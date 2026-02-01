@@ -9,12 +9,13 @@ CREATE TABLE jobs (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   started_at TIMESTAMP DEFAULT NULL,
   finished_at TIMESTAMP DEFAULT NULL,
+  error VARCHAR(255) DEFAULT NULL,
   FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
 CREATE FUNCTION notify_job_update () RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.status IN ('pending', 'exited') THEN
+  IF NEW.status IN ('pending') THEN
     PERFORM pg_notify('jobs:updated', NEW.id::text);
   END IF;
   RETURN NEW;

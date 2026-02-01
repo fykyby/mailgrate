@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"app/data"
 	"app/httpx"
+	"app/models"
 	"app/templates/pages/user"
 	"net/http"
 
@@ -37,7 +37,7 @@ func UserSignUp(c *echo.Context) error {
 		}))
 	}
 
-	_, err = data.CreateUser(c.Request().Context(), req.Email, string(hashedPassword))
+	_, err = models.CreateUser(c.Request().Context(), req.Email, string(hashedPassword))
 	if err != nil {
 		return httpx.RenderFragment(c, http.StatusBadRequest, "form", user.SignUp(user.SignUpProps{
 			Values: httpx.FormatValues(c),
@@ -66,7 +66,7 @@ func UserLogIn(c *echo.Context) error {
 		}))
 	}
 
-	u, err := data.FindUserByEmail(c.Request().Context(), req.Email)
+	u, err := models.FindUserByEmail(c.Request().Context(), req.Email)
 	if err != nil {
 		return httpx.RenderFragment(c, http.StatusBadRequest, "form", user.LogIn(user.LogInProps{
 			Values: httpx.FormatValues(c),

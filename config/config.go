@@ -8,14 +8,13 @@ import (
 )
 
 type config struct {
-	AppName                   string
-	AppKey                    string
-	IsDev                     bool
-	Port                      int
-	DbUri                     string
-	WorkerCount               int
-	WorkerPollIntervalSeconds int
-	JobQueueSize              int
+	AppName           string
+	AppKey            string
+	IsDev             bool
+	Port              int
+	DbUri             string
+	WorkerCount       int
+	JobTimeoutMinutes int
 }
 
 var Config *config
@@ -30,8 +29,7 @@ func InitConfig() {
 	cfg.Port, _ = strconv.Atoi(os.Getenv("PORT"))
 	cfg.DbUri = os.Getenv("DB_URI")
 	cfg.WorkerCount, _ = strconv.Atoi(os.Getenv("WORKER_COUNT"))
-	cfg.WorkerPollIntervalSeconds, _ = strconv.Atoi(os.Getenv("WORKER_POLL_INTERVAL_SECONDS"))
-	cfg.JobQueueSize, _ = strconv.Atoi(os.Getenv("JOB_QUEUE_SIZE"))
+	cfg.JobTimeoutMinutes, _ = strconv.Atoi(os.Getenv("JOB_TIMEOUT_MINUTES"))
 
 	Config = cfg
 }

@@ -3,7 +3,13 @@ package app
 import (
 	"app/handlers"
 	"app/httpx"
+	"app/jobs"
+	"app/models"
 	"app/templates/pages"
+	"app/worker"
+	"encoding/json"
+	"net/http"
+	"strconv"
 
 	middlewarex "app/middleware"
 
@@ -29,5 +35,62 @@ func RegisterRoutes(e *echo.Echo) {
 	ar.POST("/log-out", handlers.UserLogOut)
 	ar.GET("/app", func(c *echo.Context) error {
 		return httpx.Render(c, 200, pages.Dashboard())
+	})
+
+	ar.GET("/job/new", func(c *echo.Context) error {
+		payload := jobs.NewExample()
+
+		bytes, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+
+		_, err = models.CreateJob(c.Request().Context(), httpx.GetUserSessionData(c).ID, jobs.ExampleType, bytes)
+		if err != nil {
+			return err
+		}
+
+		return c.String(http.StatusOK, "Job started successfully")
+	})
+
+	ar.GET("/job/:id/stop", func(c *echo.Context) error {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			return err
+		}
+
+		job := worker.GetRunningJob(id)
+		if job != nil {
+			job.Cancel()
+		}
+
+		_, err = models.UpdateJob(c.Request().Context(), &models.Job{
+			ID:     id,
+			Status: models.JobStatusInterrupted,
+		})
+		if err != nil {
+			return err
+		}
+
+		return c.String(http.StatusOK, "Job interrupted successfully")
+	})
+
+	ar.GET("/job/:id/start", func(c *echo.Context) error {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			return err
+		}
+
+		_, err = models.UpdateJob(c.Request().Context(), &models.Job{
+			ID:     id,
+			Status: models.JobStatusPending,
+		})
+		if err != nil {
+			return err
+		}
+
+		return c.String(http.StatusOK, "Job unpaused successfully")
 	})
 }
