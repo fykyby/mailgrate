@@ -91,7 +91,7 @@ func FindJobByID(ctx context.Context, id int) (*Job, error) {
 	return job, err
 }
 
-func JobsByIDs(ctx context.Context, ids []int) ([]*Job, error) {
+func FindJobsByIDs(ctx context.Context, ids []int) ([]*Job, error) {
 	jobs := make([]*Job, 0, len(ids))
 
 	err := db.Bun.
@@ -129,4 +129,19 @@ func UpdateJob(ctx context.Context, job *Job) (*Job, error) {
 	}
 
 	return job, nil
+}
+
+func UpdateJobs(ctx context.Context, jobs []*Job) ([]*Job, error) {
+	_, err := db.Bun.
+		NewUpdate().
+		Model(&jobs).
+		WherePK().
+		OmitZero().
+		Bulk().
+		Exec(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return jobs, nil
 }
