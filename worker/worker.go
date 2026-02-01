@@ -73,7 +73,7 @@ func runJob(ctx context.Context, job *data.Job) error {
 	// Run the job
 	err = handler.Run(ctx)
 	if err != nil && errors.Is(err, context.Canceled) {
-		job.Status = data.JobStatusPaused
+		job.Status = data.JobStatusExited
 		err = updateJob(ctx, job, handler)
 		if err != nil {
 			return err

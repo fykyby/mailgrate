@@ -14,7 +14,7 @@ CREATE TABLE jobs (
 
 CREATE FUNCTION notify_job_update () RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.status IN ('pending', 'paused') THEN
+  IF NEW.status IN ('pending', 'exited') THEN
     PERFORM pg_notify('jobs:updated', NEW.id::text);
   END IF;
   RETURN NEW;

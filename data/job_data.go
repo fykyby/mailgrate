@@ -17,6 +17,7 @@ const (
 	JobStatusPending   JobStatus = "pending"
 	JobStatusRunning   JobStatus = "running"
 	JobStatusPaused    JobStatus = "paused"
+	JobStatusExited    JobStatus = "exited"
 	JobStatusCompleted JobStatus = "completed"
 	JobStatusFailed    JobStatus = "failed"
 )
@@ -59,7 +60,7 @@ func FindPendingJob(ctx context.Context) (*Job, error) {
 	err := db.Bun.
 		NewSelect().
 		Model(job).
-		Where("status = ?", JobStatusPaused).
+		Where("status = ?", JobStatusExited).
 		WhereOr("status = ?", JobStatusPending).
 		OrderBy("created_at", bun.OrderAsc).
 		Limit(1).
