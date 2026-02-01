@@ -1,7 +1,7 @@
 [build]
 cmd = "go build -o tmp/app cmd/server/main.go"
 bin = "tmp/app"
-include_ext = ["go", "sql", "templ", "css"]
+include_ext = ["go", "sql", "templ", "css", "js"]
 include_file = ["go.mod", ".env"]
 exclude_file = ["static/css/out.css"]
 poll = true

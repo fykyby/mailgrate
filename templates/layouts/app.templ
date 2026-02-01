@@ -25,6 +25,7 @@ templ App(props AppProps) {
 			<title>{ props.Title } - { config.Config.AppName }</title>
 			<link rel="stylesheet" href="/static/css/out.css"/>
 			<script defer src="/static/js/htmx.min.js"></script>
+			// <script defer src="/static/js/alpine.min.js"></script>
 			<script defer src="/static/js/app.js"></script>
 			@input.Script()
 			@label.Script()
@@ -34,12 +35,12 @@ templ App(props AppProps) {
 			@collapsible.Script()
 			@dropdown.Script()
 		</head>
-		<body class="dark" hx-boost="true">
+		<body class="dark" hx-boost="true" x-data>
 			@components.AppSidebar() {
 				<header class="md:hidden border-b w-full items-center p-2 flex gap-2">
 					@sidebar.Trigger()
 				</header>
-				<main class="max-w-5xl w-full mx-auto p-4 flex flex-col gap-4">
+				<main class="max-w-5xl w-full mx-auto p-4 flex flex-col gap-4 @container">
 					{ children... }
 				</main>
 			}

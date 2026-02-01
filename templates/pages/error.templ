@@ -1,0 +1,12 @@
+package pages
+
+import "app/templates/components/alert"
+import "app/templates/layouts"
+
+templ Error(message string) {
+	@layouts.Base(layouts.BaseProps{
+		Title: "Error",
+	}) {
+		@alert.Error(message)
+	}
+}
