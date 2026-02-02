@@ -40,7 +40,12 @@ func RegisterMiddleware(e *echo.Echo) {
 			return nil
 		},
 	}))
-	e.Use(middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(20.0)))
+	e.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+		Store: middleware.NewRateLimiterMemoryStore(20.0),
+		Skipper: func(c *echo.Context) bool {
+			return strings.HasPrefix(c.Path(), "/static") || c.Path() == "/favicon.ico"
+		},
+	}))
 	e.Use(middleware.Recover())
 	e.Use(middleware.Secure())
 	e.Use(middleware.CSRF())
