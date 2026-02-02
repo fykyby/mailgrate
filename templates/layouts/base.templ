@@ -3,8 +3,13 @@ package layouts
 import (
 	"app/config"
 	"app/templates/components/button"
+	"app/templates/components/collapsible"
+	"app/templates/components/dialog"
+	"app/templates/components/dropdown"
 	"app/templates/components/input"
 	"app/templates/components/label"
+	"app/templates/components/popover"
+	"app/templates/components/sidebar"
 	"app/templates/components/textarea"
 	"app/templates/utils"
 )
@@ -26,6 +31,11 @@ templ Base(props BaseProps) {
 			<script defer src="/static/js/app.js"></script>
 			@input.Script()
 			@label.Script()
+			@sidebar.Script()
+			@dialog.Script()
+			@popover.Script()
+			@collapsible.Script()
+			@dropdown.Script()
 			@textarea.Script()
 		</head>
 		<body class="dark" hx-boost="true">

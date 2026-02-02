@@ -5,8 +5,11 @@ import (
 	"app/app"
 	"app/config"
 	"app/db"
+	"app/errorsx"
 	"app/httpx"
+	"app/templates/pages"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -28,6 +31,14 @@ func main() {
 		Logger:     slog.Default(),
 		Binder:     &echo.DefaultBinder{},
 	})
+
+	e.HTTPErrorHandler = func(c *echo.Context, err error) {
+		if errorsx.IsNotFoundError(err) {
+			httpx.Render(c, http.StatusNotFound, pages.Error(httpx.MsgErrNotFound))
+		} else {
+			httpx.Render(c, http.StatusInternalServerError, pages.Error(httpx.MsgErrGeneric))
+		}
+	}
 
 	e.Static("/static", "static")
 

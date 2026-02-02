@@ -81,6 +81,14 @@ templ AppSidebar() {
 								Placement: dropdown.PlacementTop,
 							}) {
 								@dropdown.Item(dropdown.ItemProps{
+									Href: "/password-reset",
+								}) {
+									<span class="flex items-center">
+										@icon.Key(icon.Props{Size: 16, Class: "mr-2"})
+										Reset Password
+									</span>
+								}
+								@dropdown.Item(dropdown.ItemProps{
 									Attributes: templ.Attributes{
 										"hx-post": "/log-out",
 										"hx-swap": "none",

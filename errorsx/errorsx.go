@@ -16,5 +16,5 @@ func IsUniqueConstraintError(err error) bool {
 }
 
 func IsNotFoundError(err error) bool {
-	return errors.Is(err, sql.ErrNoRows)
+	return errors.Is(err, sql.ErrNoRows) || strings.Contains(strings.ToLower(err.Error()), "not found")
 }

@@ -1,7 +1,7 @@
 package httpx
 
 var (
-	MsgErrGeneric            = "Internal server error"
+	MsgErrGeneric            = "An error occurred"
 	MsgErrNotFound           = "Not found"
 	MsgErrBadRequest         = "Invalid request"
 	MsgErrRequired           = "Value is required"
