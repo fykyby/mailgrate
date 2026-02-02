@@ -1,7 +1,7 @@
 package app
 
 import (
-	"app/httpx"
+	"app/helpers"
 	"context"
 	"log/slog"
 	"strings"
@@ -49,5 +49,5 @@ func RegisterMiddleware(e *echo.Echo) {
 	e.Use(middleware.Recover())
 	e.Use(middleware.Secure())
 	e.Use(middleware.CSRF())
-	e.Use(session.Middleware(httpx.SessionStore))
+	e.Use(session.Middleware(helpers.SessionStore))
 }

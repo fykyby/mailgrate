@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"app/config"
-	"app/httpx"
+	"app/helpers"
 	"app/templates/components/alert"
 	"app/templates/pages"
 	"fmt"
@@ -13,7 +13,7 @@ import (
 )
 
 func ContactShow(c *echo.Context) error {
-	return httpx.Render(c, http.StatusOK, pages.Contact(pages.ContactProps{}))
+	return helpers.Render(c, http.StatusOK, pages.Contact(pages.ContactProps{}))
 }
 
 func ContactSend(c *echo.Context) error {
@@ -22,11 +22,11 @@ func ContactSend(c *echo.Context) error {
 		Message string `form:"Message" validate:"required,min=16,max=2048"`
 	}
 
-	err := httpx.BindAndValidate(c, &req)
+	err := helpers.BindAndValidate(c, &req)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusBadRequest, "form", pages.Contact(pages.ContactProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusBadRequest, "form", pages.Contact(pages.ContactProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
@@ -41,11 +41,11 @@ func ContactSend(c *echo.Context) error {
 
 	err = dialer.DialAndSend(message)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusBadRequest, "form", pages.Contact(pages.ContactProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusBadRequest, "form", pages.Contact(pages.ContactProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
-	return httpx.Render(c, http.StatusOK, alert.Success(httpx.MsgSuccessMessageSent))
+	return helpers.Render(c, http.StatusOK, alert.Success(helpers.MsgSuccessMessageSent))
 }

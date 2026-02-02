@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"app/httpx"
+	"app/helpers"
 	"context"
 
 	"github.com/labstack/echo/v5"
@@ -9,13 +9,13 @@ import (
 
 func WithAuthRequired(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		userSession := httpx.GetUserSessionData(c)
+		userSession := helpers.GetUserSessionData(c)
 		if userSession == nil {
-			httpx.Redirect(c, "/log-in")
+			helpers.Redirect(c, "/log-in")
 			return nil
 		}
 
-		ctx := context.WithValue(c.Request().Context(), httpx.TemplContextSessionKey, userSession)
+		ctx := context.WithValue(c.Request().Context(), helpers.TemplContextSessionKey, userSession)
 		c.SetRequest(c.Request().WithContext(ctx))
 
 		return next(c)
@@ -24,13 +24,13 @@ func WithAuthRequired(next echo.HandlerFunc) echo.HandlerFunc {
 
 func WithAuthForbidden(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		userSession := httpx.GetUserSessionData(c)
+		userSession := helpers.GetUserSessionData(c)
 		if userSession != nil {
-			httpx.Redirect(c, "/app")
+			helpers.Redirect(c, "/app")
 			return nil
 		}
 
-		ctx := context.WithValue(c.Request().Context(), httpx.TemplContextSessionKey, userSession)
+		ctx := context.WithValue(c.Request().Context(), helpers.TemplContextSessionKey, userSession)
 		c.SetRequest(c.Request().WithContext(ctx))
 
 		return next(c)
@@ -39,9 +39,9 @@ func WithAuthForbidden(next echo.HandlerFunc) echo.HandlerFunc {
 
 func WithAuthAny(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		userSession := httpx.GetUserSessionData(c)
+		userSession := helpers.GetUserSessionData(c)
 
-		ctx := context.WithValue(c.Request().Context(), httpx.TemplContextSessionKey, userSession)
+		ctx := context.WithValue(c.Request().Context(), helpers.TemplContextSessionKey, userSession)
 		c.SetRequest(c.Request().WithContext(ctx))
 
 		return next(c)

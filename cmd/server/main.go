@@ -6,7 +6,7 @@ import (
 	"app/config"
 	"app/db"
 	"app/errorsx"
-	"app/httpx"
+	"app/helpers"
 	"app/templates/pages"
 	"context"
 	"log/slog"
@@ -32,22 +32,22 @@ func main() {
 	db.InitPostgresDatabase()
 	defer db.Bun.Close()
 
-	httpx.InitPostgresSessionStore()
-	defer httpx.SessionStore.Close()
-	defer httpx.SessionStore.StopCleanup(httpx.SessionStore.Cleanup(time.Minute * 60))
+	helpers.InitPostgresSessionStore()
+	defer helpers.SessionStore.Close()
+	defer helpers.SessionStore.StopCleanup(helpers.SessionStore.Cleanup(time.Minute * 60))
 
 	e := echo.NewWithConfig(echo.Config{
 		Filesystem: efs.StaticFS,
-		Validator:  httpx.NewValidator(),
+		Validator:  helpers.NewValidator(),
 		Logger:     slog.Default(),
 		Binder:     &echo.DefaultBinder{},
 	})
 
 	e.HTTPErrorHandler = func(c *echo.Context, err error) {
 		if errorsx.IsNotFoundError(err) {
-			httpx.Render(c, http.StatusNotFound, pages.Error(httpx.MsgErrNotFound))
+			helpers.Render(c, http.StatusNotFound, pages.Error(helpers.MsgErrNotFound))
 		} else {
-			httpx.Render(c, http.StatusInternalServerError, pages.Error(httpx.MsgErrGeneric))
+			helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
 		}
 	}
 

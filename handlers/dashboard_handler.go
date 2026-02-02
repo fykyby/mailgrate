@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"app/httpx"
+	"app/helpers"
 	"app/templates/pages/app"
 	"net/http"
 
@@ -9,5 +9,5 @@ import (
 )
 
 func DashboardShow(c *echo.Context) error {
-	return httpx.Render(c, http.StatusOK, app.Dashboard())
+	return helpers.Render(c, http.StatusOK, app.Dashboard())
 }

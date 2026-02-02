@@ -1,4 +1,4 @@
-package httpx
+package helpers
 
 var (
 	MsgErrGeneric            = "An error occurred"

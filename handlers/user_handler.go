@@ -3,7 +3,7 @@ package handlers
 import (
 	"app/config"
 	"app/errorsx"
-	"app/httpx"
+	"app/helpers"
 	"app/models"
 	"app/templates/components/alert"
 	"app/templates/pages"
@@ -23,7 +23,7 @@ import (
 )
 
 func UserShowSignUp(c *echo.Context) error {
-	return httpx.Render(c, http.StatusOK, user.SignUp(user.SignUpProps{}))
+	return helpers.Render(c, http.StatusOK, user.SignUp(user.SignUpProps{}))
 }
 
 func UserSignUp(c *echo.Context) error {
@@ -33,28 +33,28 @@ func UserSignUp(c *echo.Context) error {
 		PasswordConfirm string `form:"PasswordConfirm" validate:"required,min=8,max=255,eqfield=Password"`
 	}
 
-	err := httpx.BindAndValidate(c, &req)
+	err := helpers.BindAndValidate(c, &req)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusBadRequest, "form", user.SignUp(user.SignUpProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusBadRequest, "form", user.SignUp(user.SignUpProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.SignUp(user.SignUpProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", user.SignUp(user.SignUpProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
 	rawToken := make([]byte, 32)
 	_, err = rand.Read(rawToken)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.SignUp(user.SignUpProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", user.SignUp(user.SignUpProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
@@ -67,9 +67,9 @@ func UserSignUp(c *echo.Context) error {
 
 	u, err := models.CreateUser(c.Request().Context(), req.Email, string(hashedPassword), confirmTokenHash, confirmTokenExpiresAt)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.SignUp(user.SignUpProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", user.SignUp(user.SignUpProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
@@ -84,9 +84,9 @@ func UserSignUp(c *echo.Context) error {
 
 		err = dialer.DialAndSend(message)
 		if err != nil {
-			return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
-				Values: httpx.FormatValues(c),
-				Errors: httpx.FormatErrors(err),
+			return helpers.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
+				Values: helpers.FormatValues(c),
+				Errors: helpers.FormatErrors(err),
 			}))
 		}
 	} else {
@@ -96,7 +96,7 @@ func UserSignUp(c *echo.Context) error {
 		_, err = models.UpdateUser(c.Request().Context(), u)
 	}
 
-	return httpx.Render(c, http.StatusOK, alert.Success(httpx.MsgSuccessUserCreated))
+	return helpers.Render(c, http.StatusOK, alert.Success(helpers.MsgSuccessUserCreated))
 }
 
 func UserSignUpConfirm(c *echo.Context) error {
@@ -106,7 +106,7 @@ func UserSignUpConfirm(c *echo.Context) error {
 
 	u, err := models.FindUserByConfirmationTokenHash(c.Request().Context(), tokenHash)
 	if err != nil {
-		return httpx.Render(c, http.StatusNotFound, pages.Error(httpx.MsgErrNotFound))
+		return helpers.Render(c, http.StatusNotFound, pages.Error(helpers.MsgErrNotFound))
 	}
 
 	// No need to validate token expiration date - users get deleted if token is expired
@@ -117,14 +117,14 @@ func UserSignUpConfirm(c *echo.Context) error {
 
 	_, err = models.UpdateUser(c.Request().Context(), u)
 	if err != nil {
-		return httpx.Render(c, http.StatusInternalServerError, pages.Error(httpx.MsgErrGeneric))
+		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
 	}
 
-	return httpx.Redirect(c, "/log-in")
+	return helpers.Redirect(c, "/log-in")
 }
 
 func UserShowLogIn(c *echo.Context) error {
-	return httpx.Render(c, http.StatusOK, user.LogIn(user.LogInProps{}))
+	return helpers.Render(c, http.StatusOK, user.LogIn(user.LogInProps{}))
 }
 
 func UserLogIn(c *echo.Context) error {
@@ -133,70 +133,70 @@ func UserLogIn(c *echo.Context) error {
 		Password string `form:"Password" validate:"required,min=8,max=255"`
 	}
 
-	err := httpx.BindAndValidate(c, &req)
+	err := helpers.BindAndValidate(c, &req)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusBadRequest, "form", user.LogIn(user.LogInProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusBadRequest, "form", user.LogIn(user.LogInProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
 	u, err := models.FindUserByEmail(c.Request().Context(), req.Email)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusNotFound, "form", user.LogIn(user.LogInProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusNotFound, "form", user.LogIn(user.LogInProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
 	if !u.Confirmed {
 		err := errors.New("not found - user not confirmed")
-		return httpx.RenderFragment(c, http.StatusNotFound, "form", user.LogIn(user.LogInProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusNotFound, "form", user.LogIn(user.LogInProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password))
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusNotFound, "form", user.LogIn(user.LogInProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusNotFound, "form", user.LogIn(user.LogInProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
-	err = httpx.SetUserSessionData(c, &httpx.UserSessionData{
+	err = helpers.SetUserSessionData(c, &helpers.UserSessionData{
 		ID:    u.ID,
 		Email: u.Email,
 	})
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.LogIn(user.LogInProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", user.LogIn(user.LogInProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
-	return httpx.Redirect(c, "/app")
+	return helpers.Redirect(c, "/app")
 }
 
 func UserLogOut(c *echo.Context) error {
-	err := httpx.ClearUserSessionData(c)
+	err := helpers.ClearUserSessionData(c)
 	if err != nil {
-		return httpx.Render(c, http.StatusInternalServerError, pages.Error(httpx.MsgErrGeneric))
+		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
 	}
 
-	return httpx.Redirect(c, "/log-in")
+	return helpers.Redirect(c, "/log-in")
 }
 
 func UserShowRequestPasswordReset(c *echo.Context) error {
 	values := make(map[string]string)
 
-	u := httpx.GetUserSessionData(c)
+	u := helpers.GetUserSessionData(c)
 	if u != nil {
 		values["Email"] = u.Email
 	}
 
-	return httpx.Render(c, http.StatusOK, user.RequestPasswordReset(user.RequestPasswordResetProps{
+	return helpers.Render(c, http.StatusOK, user.RequestPasswordReset(user.RequestPasswordResetProps{
 		Values: values,
 	}))
 }
@@ -206,31 +206,31 @@ func UserRequestPasswordReset(c *echo.Context) error {
 		Email string `form:"Email" validate:"required,email,max=255"`
 	}
 
-	err := httpx.BindAndValidate(c, &req)
+	err := helpers.BindAndValidate(c, &req)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusBadRequest, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusBadRequest, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
 	u, err := models.FindUserByEmail(c.Request().Context(), req.Email)
 	if err != nil {
 		if errorsx.IsNotFoundError(err) {
-			return httpx.Render(c, http.StatusOK, alert.Success(httpx.MsgSuccessMessageSent))
+			return helpers.Render(c, http.StatusOK, alert.Success(helpers.MsgSuccessMessageSent))
 		}
-		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
 	rawToken := make([]byte, 32)
 	_, err = rand.Read(rawToken)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
@@ -246,9 +246,9 @@ func UserRequestPasswordReset(c *echo.Context) error {
 
 	_, err = models.UpdateUser(c.Request().Context(), u)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
@@ -266,13 +266,13 @@ func UserRequestPasswordReset(c *echo.Context) error {
 
 	err = dialer.DialAndSend(message)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
-	return httpx.Render(c, http.StatusOK, alert.Success(httpx.MsgSuccessMessageSent))
+	return helpers.Render(c, http.StatusOK, alert.Success(helpers.MsgSuccessMessageSent))
 }
 
 func UserShowPasswordReset(c *echo.Context) error {
@@ -283,17 +283,17 @@ func UserShowPasswordReset(c *echo.Context) error {
 	u, err := models.FindUserByPasswordResetTokenhash(c.Request().Context(), tokenHash)
 	if err != nil {
 		if errorsx.IsNotFoundError(err) {
-			return httpx.Render(c, http.StatusNotFound, pages.Error(httpx.MsgErrNotFound))
+			return helpers.Render(c, http.StatusNotFound, pages.Error(helpers.MsgErrNotFound))
 		}
 
-		return httpx.Render(c, http.StatusInternalServerError, pages.Error(httpx.MsgErrGeneric))
+		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
 	}
 
-	if u.ID != httpx.GetUserSessionData(c).ID {
-		_ = httpx.ClearUserSessionData(c)
+	if u.ID != helpers.GetUserSessionData(c).ID {
+		_ = helpers.ClearUserSessionData(c)
 	}
 
-	return httpx.Render(c, http.StatusOK, user.PasswordReset(user.PasswordResetProps{
+	return helpers.Render(c, http.StatusOK, user.PasswordReset(user.PasswordResetProps{
 		Token: token,
 	}))
 }
@@ -308,41 +308,41 @@ func UserPasswordReset(c *echo.Context) error {
 	rawTokenHash := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(rawTokenHash[:])
 
-	err := httpx.BindAndValidate(c, &req)
+	err := helpers.BindAndValidate(c, &req)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusBadRequest, "form", user.PasswordReset(user.PasswordResetProps{
+		return helpers.RenderFragment(c, http.StatusBadRequest, "form", user.PasswordReset(user.PasswordResetProps{
 			Token:  token,
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
 	u, err := models.FindUserByPasswordResetTokenhash(c.Request().Context(), tokenHash)
 	if err != nil {
 		if errorsx.IsNotFoundError(err) {
-			return httpx.Render(c, http.StatusNotFound, pages.Error(httpx.MsgErrNotFound))
+			return helpers.Render(c, http.StatusNotFound, pages.Error(helpers.MsgErrNotFound))
 		}
-		return httpx.RenderFragment(c, http.StatusNotFound, "form", user.PasswordReset(user.PasswordResetProps{
+		return helpers.RenderFragment(c, http.StatusNotFound, "form", user.PasswordReset(user.PasswordResetProps{
 			Token:  token,
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
 	if time.Now().After(u.PasswordResetExpiresAt) {
-		return httpx.RenderFragment(c, http.StatusNotFound, "form", user.PasswordReset(user.PasswordResetProps{
+		return helpers.RenderFragment(c, http.StatusNotFound, "form", user.PasswordReset(user.PasswordResetProps{
 			Token:  token,
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.PasswordReset(user.PasswordResetProps{
+		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", user.PasswordReset(user.PasswordResetProps{
 			Token:  token,
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
@@ -352,16 +352,16 @@ func UserPasswordReset(c *echo.Context) error {
 
 	_, err = models.UpdateUser(c.Request().Context(), u)
 	if err != nil {
-		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.PasswordReset(user.PasswordResetProps{
+		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", user.PasswordReset(user.PasswordResetProps{
 			Token:  token,
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
 		}))
 	}
 
-	if httpx.GetUserSessionData(c) != nil {
-		return httpx.Redirect(c, "/app")
+	if helpers.GetUserSessionData(c) != nil {
+		return helpers.Redirect(c, "/app")
 	}
 
-	return httpx.Redirect(c, "/log-in")
+	return helpers.Redirect(c, "/log-in")
 }

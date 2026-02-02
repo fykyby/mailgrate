@@ -1,4 +1,4 @@
-package httpx
+package helpers
 
 import "github.com/go-playground/validator/v10"
 
