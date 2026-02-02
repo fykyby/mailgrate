@@ -2,13 +2,13 @@ package alert
 
 import "app/templates/components/icon"
 
-templ Error(message string) {
+templ Success(message string) {
 	@Alert(Props{
-		Variant: VariantDestructive,
+		Variant: VariantDefault,
 	}) {
-		@icon.TriangleAlert()
+		@icon.Check()
 		@Title() {
-			Error
+			Success
 		}
 		@Description() {
 			{ message }

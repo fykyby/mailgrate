@@ -14,5 +14,6 @@ var (
 	MsgErrJobQueueFull       = "Job queue is full"
 	MsgErrWorkersUnavailable = "No available workers"
 
-	MsgSuccess = "Success"
+	MsgSuccessGeneric     = "Action completed successfully"
+	MsgSuccessMessageSent = "Message sent"
 )

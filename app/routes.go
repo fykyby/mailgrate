@@ -11,11 +11,13 @@ import (
 )
 
 func RegisterRoutes(e *echo.Echo) {
-	g := e.Group("")
-	g.Use(middlewarex.WithAuthAny)
-	g.GET("/", func(c *echo.Context) error {
+	aa := e.Group("")
+	aa.Use(middlewarex.WithAuthAny)
+	aa.GET("/", func(c *echo.Context) error {
 		return httpx.Render(c, 200, pages.Home())
 	})
+	aa.GET("/contact", handlers.ContactShow)
+	aa.POST("/contact", handlers.ContactSend)
 
 	af := e.Group("")
 	af.Use(middlewarex.WithAuthForbidden)

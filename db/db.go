@@ -17,7 +17,7 @@ import (
 var Bun *bun.DB
 
 func InitPostgresDatabase() {
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.Config.DbUri)))
+	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.Config.DatabaseURL)))
 	Bun = bun.NewDB(sqldb, pgdialect.New())
 
 	if os.Getenv("ENV") != "dev" {

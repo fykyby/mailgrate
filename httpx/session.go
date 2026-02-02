@@ -23,7 +23,7 @@ type UserSessionData struct {
 var SessionStore *pgstore.PGStore
 
 func InitPostgresSessionStore() {
-	store, err := pgstore.NewPGStore(config.Config.DbUri, []byte(config.Config.AppKey))
+	store, err := pgstore.NewPGStore(config.Config.DatabaseURL, []byte(config.Config.AppKey))
 	if err != nil {
 		panic(err)
 	}

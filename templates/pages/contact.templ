@@ -1,0 +1,79 @@
+package pages
+
+import (
+	"app/templates/components/alert"
+	"app/templates/components/button"
+	"app/templates/components/form"
+	"app/templates/components/input"
+	"app/templates/components/textarea"
+	"app/templates/layouts"
+)
+
+type ContactProps struct {
+	Values map[string]string
+	Errors map[string]string
+}
+
+templ Contact(props ContactProps) {
+	@layouts.Base(layouts.BaseProps{
+		Title: "Contact",
+	}) {
+		<h1>
+			Contact
+		</h1>
+		@templ.Fragment("form") {
+			<form id="form" hx-post="/contact" hx-swap="outerHTML">
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "Email",
+					}) {
+						Email
+					}
+					@input.Input(input.Props{
+						ID:       "Email",
+						Name:     "Email",
+						Type:     input.TypeEmail,
+						Value:    props.Values["Email"],
+						HasError: props.Errors["Email"] != "",
+					})
+					if props.Errors["Email"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["Email"] }
+						}
+					}
+				}
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "Message",
+					}) {
+						Message
+					}
+					@textarea.Textarea(textarea.Props{
+						ID:       "Message",
+						Name:     "Message",
+						Value:    props.Values["Message"],
+						HasError: props.Errors["Message"] != "",
+						Rows:     8,
+					})
+					if props.Errors["Message"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["Message"] }
+						}
+					}
+				}
+				if props.Errors["_Error"] != "" {
+					@alert.Error(props.Errors["_Error"])
+				}
+				@button.Button(button.Props{
+					Type: button.TypeSubmit,
+				}) {
+					Submit
+				}
+			</form>
+		}
+	}
+}

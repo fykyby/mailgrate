@@ -1,5 +1,5 @@
 document.body.addEventListener("htmx:beforeOnLoad", function (event) {
-    if (event.detail.xhr.status >= 400 && evt.detail.xhr.status < 600) {
+    if (event.detail.xhr.status >= 400 && event.detail.xhr.status < 600) {
         event.detail.shouldSwap = true;
         event.detail.isError = false;
     }

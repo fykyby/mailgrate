@@ -5,6 +5,7 @@ import (
 	"app/templates/components/button"
 	"app/templates/components/input"
 	"app/templates/components/label"
+	"app/templates/components/textarea"
 	"app/templates/utils"
 )
 
@@ -25,6 +26,7 @@ templ Base(props BaseProps) {
 			<script defer src="/static/js/app.js"></script>
 			@input.Script()
 			@label.Script()
+			@textarea.Script()
 		</head>
 		<body class="dark" hx-boost="true">
 			<header class="border-b">
@@ -34,6 +36,12 @@ templ Base(props BaseProps) {
 						Href:    "/",
 					}) {
 						Home
+					}
+					@button.Button(button.Props{
+						Variant: button.VariantGhost,
+						Href:    "/contact",
+					}) {
+						Contact
 					}
 					if utils.GetUserData(ctx) == nil {
 						@button.Button(button.Props{

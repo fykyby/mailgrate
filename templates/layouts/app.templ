@@ -10,6 +10,7 @@ import (
 	"app/templates/components/label"
 	"app/templates/components/popover"
 	"app/templates/components/sidebar"
+	"app/templates/components/textarea"
 )
 
 type AppProps struct {
@@ -34,6 +35,7 @@ templ App(props AppProps) {
 			@popover.Script()
 			@collapsible.Script()
 			@dropdown.Script()
+			@textarea.Script()
 		</head>
 		<body class="dark" hx-boost="true" x-data>
 			@components.AppSidebar() {
