@@ -16,4 +16,5 @@ var (
 
 	MsgSuccessGeneric     = "Action completed successfully"
 	MsgSuccessMessageSent = "Message sent"
+	MsgSuccessUserCreated = "Account created. Check your email for verification"
 )

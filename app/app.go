@@ -3,6 +3,7 @@ package app
 import (
 	"app/config"
 	"app/db"
+	"app/models"
 	"app/worker"
 	"context"
 	"errors"
@@ -13,23 +14,13 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/labstack/echo/v5"
 	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 func Start(e *echo.Echo) error {
-	loggerOptions := &slog.HandlerOptions{}
-
-	if config.Config.IsDev {
-		loggerOptions.Level = slog.LevelDebug
-	} else {
-		loggerOptions.Level = slog.LevelInfo
-	}
-
-	logger := slog.New(slog.NewTextHandler(os.Stdout, loggerOptions))
-	slog.SetDefault(logger)
-
 	sigCtx, sigCancel := signal.NotifyContext(
 		context.Background(),
 		os.Interrupt,
@@ -92,4 +83,20 @@ func Start(e *echo.Echo) error {
 	workerWg.Wait()
 
 	return nil
+}
+
+func RunBackgroundCleanUp(ctx context.Context) {
+	ticker := time.NewTicker(24 * time.Hour)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				slog.Info("running background cleanup")
+				_ = models.DeleteExpiredUsers(ctx)
+			}
+		}
+	}()
 }

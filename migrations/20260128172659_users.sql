@@ -3,24 +3,18 @@
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   email VARCHAR(255) NOT NULL,
-  password VARCHAR(255) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+  confirmation_token_hash VARCHAR(255) NULL DEFAULT NULL,
+  confirmation_expires_at TIMESTAMP NULL DEFAULT NULL,
+  password_reset_token_hash VARCHAR(255) NULL DEFAULT NULL,
+  password_reset_expires_at TIMESTAMP NULL DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE password_resets (
-  id SERIAL PRIMARY KEY,
-  user_id INT NOT NULL REFERENCES users (id),
-  token VARCHAR(255) NOT NULL,
-  expires_at TIMESTAMP NOT NULL,
-  FOREIGN KEY (user_id) REFERENCES users (id),
-  UNIQUE (user_id)
 );
 
 -- +goose StatementEnd
 -- +goose Down
 -- +goose StatementBegin
-DROP TABLE IF EXISTS password_resets;
-
 DROP TABLE IF EXISTS users;
 
 -- +goose StatementEnd

@@ -56,15 +56,15 @@ templ Base(props BaseProps) {
 					if utils.GetUserData(ctx) == nil {
 						@button.Button(button.Props{
 							Variant: button.VariantGhost,
-							Href:    "/sign-up",
-						}) {
-							Sign Up
-						}
-						@button.Button(button.Props{
-							Variant: button.VariantGhost,
 							Href:    "/log-in",
 						}) {
 							Log In
+						}
+						@button.Button(button.Props{
+							Variant: button.VariantGhost,
+							Href:    "/sign-up",
+						}) {
+							Sign Up
 						}
 					} else {
 						@button.Button(button.Props{

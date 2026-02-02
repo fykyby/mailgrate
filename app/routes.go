@@ -28,6 +28,7 @@ func RegisterRoutes(e *echo.Echo) {
 	af.Use(middlewarex.WithAuthForbidden)
 	af.GET("/sign-up", handlers.UserShowSignUp)
 	af.POST("/sign-up", handlers.UserSignUp)
+	af.GET("/sign-up/:token", handlers.UserSignUpConfirm)
 	af.GET("/log-in", handlers.UserShowLogIn)
 	af.POST("/log-in", handlers.UserLogIn)
 

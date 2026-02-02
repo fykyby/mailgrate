@@ -8,11 +8,11 @@ import (
 	"app/templates/components/alert"
 	"app/templates/pages"
 	"app/templates/pages/user"
-	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -49,12 +49,75 @@ func UserSignUp(c *echo.Context) error {
 		}))
 	}
 
-	_, err = models.CreateUser(c.Request().Context(), req.Email, string(hashedPassword))
+	rawToken := make([]byte, 32)
+	_, err = rand.Read(rawToken)
 	if err != nil {
 		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.SignUp(user.SignUpProps{
 			Values: httpx.FormatValues(c),
 			Errors: httpx.FormatErrors(err),
 		}))
+	}
+
+	confirmToken := base64.RawURLEncoding.EncodeToString(rawToken)
+
+	rawConfirmTokenHash := sha256.Sum256([]byte(confirmToken))
+	confirmTokenHash := hex.EncodeToString(rawConfirmTokenHash[:])
+
+	confirmTokenExpiresAt := time.Now().Add(72 * time.Hour)
+
+	u, err := models.CreateUser(c.Request().Context(), req.Email, string(hashedPassword), confirmTokenHash, confirmTokenExpiresAt)
+	if err != nil {
+		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.SignUp(user.SignUpProps{
+			Values: httpx.FormatValues(c),
+			Errors: httpx.FormatErrors(err),
+		}))
+	}
+
+	if !config.Config.IsDev {
+		dialer := gomail.NewDialer(config.Config.SMTPHost, config.Config.SMTPPort, config.Config.SMTPLogin, config.Config.SMTPPassword)
+
+		message := gomail.NewMessage()
+		message.SetHeader("From", config.Config.SMTPLogin)
+		message.SetHeader("To", req.Email)
+		message.SetHeader("Subject", fmt.Sprintf("%s | Confirm Email", config.Config.AppName))
+		message.SetBody("text/html", fmt.Sprintf("Confirm Email Link: <a href='%s'>Click here</a>", fmt.Sprintf("https://%s/sign-up/%s", c.Request().Host, confirmToken)))
+
+		err = dialer.DialAndSend(message)
+		if err != nil {
+			return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
+				Values: httpx.FormatValues(c),
+				Errors: httpx.FormatErrors(err),
+			}))
+		}
+	} else {
+		u.Confirmed = true
+		u.ConfirmationTokenHash = ""
+		u.ConfirmationExpiresAt = time.Time{}
+		_, err = models.UpdateUser(c.Request().Context(), u)
+	}
+
+	return httpx.Render(c, http.StatusOK, alert.Success(httpx.MsgSuccessUserCreated))
+}
+
+func UserSignUpConfirm(c *echo.Context) error {
+	token := c.Param("token")
+	rawTokenHash := sha256.Sum256([]byte(token))
+	tokenHash := hex.EncodeToString(rawTokenHash[:])
+
+	u, err := models.FindUserByConfirmationTokenHash(c.Request().Context(), tokenHash)
+	if err != nil {
+		return httpx.Render(c, http.StatusNotFound, pages.Error(httpx.MsgErrNotFound))
+	}
+
+	// No need to validate token expiration date - users get deleted if token is expired
+
+	u.Confirmed = true
+	u.ConfirmationTokenHash = ""
+	u.ConfirmationExpiresAt = time.Time{}
+
+	_, err = models.UpdateUser(c.Request().Context(), u)
+	if err != nil {
+		return httpx.Render(c, http.StatusInternalServerError, pages.Error(httpx.MsgErrGeneric))
 	}
 
 	return httpx.Redirect(c, "/log-in")
@@ -86,7 +149,15 @@ func UserLogIn(c *echo.Context) error {
 		}))
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.Password))
+	if !u.Confirmed {
+		err := errors.New("not found - user not confirmed")
+		return httpx.RenderFragment(c, http.StatusNotFound, "form", user.LogIn(user.LogInProps{
+			Values: httpx.FormatValues(c),
+			Errors: httpx.FormatErrors(err),
+		}))
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password))
 	if err != nil {
 		return httpx.RenderFragment(c, http.StatusNotFound, "form", user.LogIn(user.LogInProps{
 			Values: httpx.FormatValues(c),
@@ -94,18 +165,25 @@ func UserLogIn(c *echo.Context) error {
 		}))
 	}
 
-	httpx.SetUserSessionData(c, &httpx.UserSessionData{
+	err = httpx.SetUserSessionData(c, &httpx.UserSessionData{
 		ID:    u.ID,
 		Email: u.Email,
 	})
-
-	go models.DeletePasswordResetByUserID(context.Background(), u.ID)
+	if err != nil {
+		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.LogIn(user.LogInProps{
+			Values: httpx.FormatValues(c),
+			Errors: httpx.FormatErrors(err),
+		}))
+	}
 
 	return httpx.Redirect(c, "/app")
 }
 
 func UserLogOut(c *echo.Context) error {
-	httpx.ClearUserSessionData(c)
+	err := httpx.ClearUserSessionData(c)
+	if err != nil {
+		return httpx.Render(c, http.StatusInternalServerError, pages.Error(httpx.MsgErrGeneric))
+	}
 
 	return httpx.Redirect(c, "/log-in")
 }
@@ -147,24 +225,6 @@ func UserRequestPasswordReset(c *echo.Context) error {
 		}))
 	}
 
-	existingReset, err := models.FindPasswordResetByUserID(c.Request().Context(), u.ID)
-	if err != nil && !errorsx.IsNotFoundError(err) {
-		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
-			Values: httpx.FormatValues(c),
-			Errors: httpx.FormatErrors(err),
-		}))
-	}
-
-	if existingReset != nil {
-		err := models.DeletePasswordReset(c.Request().Context(), existingReset.ID)
-		if err != nil {
-			return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
-				Values: httpx.FormatValues(c),
-				Errors: httpx.FormatErrors(err),
-			}))
-		}
-	}
-
 	rawToken := make([]byte, 32)
 	_, err = rand.Read(rawToken)
 	if err != nil {
@@ -179,7 +239,12 @@ func UserRequestPasswordReset(c *echo.Context) error {
 	rawTokenHash := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(rawTokenHash[:])
 
-	_, err = models.CreatePasswordReset(c.Request().Context(), u.ID, tokenHash, time.Now().Add(1*time.Hour))
+	expiresAt := time.Now().Add(1 * time.Hour)
+
+	u.PasswordResetTokenHash = tokenHash
+	u.PasswordResetExpiresAt = expiresAt
+
+	_, err = models.UpdateUser(c.Request().Context(), u)
 	if err != nil {
 		return httpx.RenderFragment(c, http.StatusInternalServerError, "form", user.RequestPasswordReset(user.RequestPasswordResetProps{
 			Values: httpx.FormatValues(c),
@@ -215,13 +280,17 @@ func UserShowPasswordReset(c *echo.Context) error {
 	rawTokenHash := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(rawTokenHash[:])
 
-	reset, err := models.FindPasswordResetByToken(c.Request().Context(), tokenHash)
-	if err != nil && !errorsx.IsNotFoundError(err) {
+	u, err := models.FindUserByPasswordResetTokenhash(c.Request().Context(), tokenHash)
+	if err != nil {
+		if errorsx.IsNotFoundError(err) {
+			return httpx.Render(c, http.StatusNotFound, pages.Error(httpx.MsgErrNotFound))
+		}
+
 		return httpx.Render(c, http.StatusInternalServerError, pages.Error(httpx.MsgErrGeneric))
 	}
 
-	if reset == nil {
-		return httpx.Render(c, http.StatusNotFound, pages.Error(httpx.MsgErrNotFound))
+	if u.ID != httpx.GetUserSessionData(c).ID {
+		_ = httpx.ClearUserSessionData(c)
 	}
 
 	return httpx.Render(c, http.StatusOK, user.PasswordReset(user.PasswordResetProps{
@@ -248,8 +317,11 @@ func UserPasswordReset(c *echo.Context) error {
 		}))
 	}
 
-	reset, err := models.FindPasswordResetByToken(c.Request().Context(), tokenHash)
+	u, err := models.FindUserByPasswordResetTokenhash(c.Request().Context(), tokenHash)
 	if err != nil {
+		if errorsx.IsNotFoundError(err) {
+			return httpx.Render(c, http.StatusNotFound, pages.Error(httpx.MsgErrNotFound))
+		}
 		return httpx.RenderFragment(c, http.StatusNotFound, "form", user.PasswordReset(user.PasswordResetProps{
 			Token:  token,
 			Values: httpx.FormatValues(c),
@@ -257,9 +329,8 @@ func UserPasswordReset(c *echo.Context) error {
 		}))
 	}
 
-	u, err := models.FindUserByID(c.Request().Context(), reset.UserID)
-	if err != nil {
-		return httpx.RenderFragment(c, http.StatusBadRequest, "form", user.PasswordReset(user.PasswordResetProps{
+	if time.Now().After(u.PasswordResetExpiresAt) {
+		return httpx.RenderFragment(c, http.StatusNotFound, "form", user.PasswordReset(user.PasswordResetProps{
 			Token:  token,
 			Values: httpx.FormatValues(c),
 			Errors: httpx.FormatErrors(err),
@@ -275,7 +346,9 @@ func UserPasswordReset(c *echo.Context) error {
 		}))
 	}
 
-	u.Password = string(hashedPassword)
+	u.PasswordHash = string(hashedPassword)
+	u.PasswordResetTokenHash = ""
+	u.PasswordResetExpiresAt = time.Time{}
 
 	_, err = models.UpdateUser(c.Request().Context(), u)
 	if err != nil {
@@ -286,7 +359,9 @@ func UserPasswordReset(c *echo.Context) error {
 		}))
 	}
 
-	_ = models.DeletePasswordReset(c.Request().Context(), reset.ID)
+	if httpx.GetUserSessionData(c) != nil {
+		return httpx.Redirect(c, "/app")
+	}
 
 	return httpx.Redirect(c, "/log-in")
 }

@@ -8,8 +8,10 @@ import (
 	"app/errorsx"
 	"app/httpx"
 	"app/templates/pages"
+	"context"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -17,6 +19,15 @@ import (
 
 func main() {
 	config.InitConfig()
+
+	loggerOptions := &slog.HandlerOptions{}
+	if config.Config.IsDev {
+		loggerOptions.Level = slog.LevelDebug
+	} else {
+		loggerOptions.Level = slog.LevelInfo
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, loggerOptions))
+	slog.SetDefault(logger)
 
 	db.InitPostgresDatabase()
 	defer db.Bun.Close()
@@ -45,6 +56,7 @@ func main() {
 	app.RegisterMiddleware(e)
 	app.RegisterRoutes(e)
 	app.RegisterJobs()
+	app.RunBackgroundCleanUp(context.Background())
 
 	if err := app.Start(e); err != nil {
 		slog.Error(err.Error())

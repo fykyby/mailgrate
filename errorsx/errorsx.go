@@ -7,8 +7,12 @@ import (
 )
 
 func IsUniqueConstraintError(err error) bool {
-	if err != nil && (strings.Contains(err.Error(), "duplicate key") ||
-		strings.Contains(err.Error(), "UNIQUE constraint")) {
+	if err == nil {
+		return false
+	}
+
+	if strings.Contains(err.Error(), "duplicate key") ||
+		strings.Contains(err.Error(), "UNIQUE constraint") {
 		return true
 	}
 
@@ -16,5 +20,9 @@ func IsUniqueConstraintError(err error) bool {
 }
 
 func IsNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+
 	return errors.Is(err, sql.ErrNoRows) || strings.Contains(strings.ToLower(err.Error()), "not found")
 }
