@@ -1,0 +1,7 @@
+{
+  "componentsDir": "templates/components",
+  "utilsDir": "templates/utils",
+  "moduleName": "app",
+  "jsDir": "static/js",
+  "jsPublicPath": "/static/js"
+}

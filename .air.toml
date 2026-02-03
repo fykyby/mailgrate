@@ -1,0 +1,13 @@
+[build]
+cmd = "go build -o tmp/app cmd/server/main.go"
+bin = "tmp/app"
+include_ext = ["go", "sql", "templ", "css", "js", ".env"]
+include_file = ["go.mod", ".env"]
+exclude_file = ["static/css/out.css"]
+poll = true
+delay = 100
+stop_on_error = false
+exclude_regex = [".*\\_templ.go$"]
+tmp_dir = "tmp"
+pre_cmd = ["templ generate && tailwindcss -i static/css/app.css -o static/css/out.css"]
+send_interrupt = true

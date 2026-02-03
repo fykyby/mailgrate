@@ -1,0 +1,99 @@
+package user
+
+import (
+	"app/templates/components/alert"
+	"app/templates/components/button"
+	"app/templates/components/form"
+	"app/templates/components/input"
+	"app/templates/layouts"
+)
+
+type SignUpProps struct {
+	Values map[string]string
+	Errors map[string]string
+}
+
+templ SignUp(props SignUpProps) {
+	@layouts.Base(layouts.BaseProps{
+		Title: "Sign Up",
+	}) {
+		<h1>
+			Sign Up
+		</h1>
+		@templ.Fragment("form") {
+			<form id="form" hx-post="/sign-up" hx-swap="outerHTML">
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "Email",
+					}) {
+						Email
+					}
+					@input.Input(input.Props{
+						ID:       "Email",
+						Name:     "Email",
+						Type:     input.TypeEmail,
+						Value:    props.Values["Email"],
+						HasError: props.Errors["Email"] != "",
+					})
+					if props.Errors["Email"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["Email"] }
+						}
+					}
+				}
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "Password",
+					}) {
+						Password
+					}
+					@input.Input(input.Props{
+						ID:       "Password",
+						Name:     "Password",
+						Type:     input.TypePassword,
+						Value:    props.Values["Password"],
+						HasError: props.Errors["Password"] != "",
+					})
+					if props.Errors["Password"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["Password"] }
+						}
+					}
+				}
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "PasswordConfirm",
+					}) {
+						Confirm Password
+					}
+					@input.Input(input.Props{
+						ID:       "PasswordConfirm",
+						Name:     "PasswordConfirm",
+						Type:     input.TypePassword,
+						Value:    props.Values["PasswordConfirm"],
+						HasError: props.Errors["PasswordConfirm"] != "",
+					})
+					if props.Errors["PasswordConfirm"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["PasswordConfirm"] }
+						}
+					}
+				}
+				if props.Errors["_Error"] != "" {
+					@alert.Error(props.Errors["_Error"])
+				}
+				@button.Button(button.Props{
+					Type: button.TypeSubmit,
+				}) {
+					Submit
+				}
+			</form>
+		}
+	}
+}

@@ -1,0 +1,17 @@
+package alert
+
+import "app/templates/components/icon"
+
+templ Success(message string) {
+	@Alert(Props{
+		Variant: VariantDefault,
+	}) {
+		@icon.Check()
+		@Title() {
+			Success
+		}
+		@Description() {
+			{ message }
+		}
+	}
+}

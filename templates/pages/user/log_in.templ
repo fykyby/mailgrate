@@ -1,0 +1,85 @@
+package user
+
+import (
+	"app/templates/components/alert"
+	"app/templates/components/button"
+	"app/templates/components/form"
+	"app/templates/components/input"
+	"app/templates/layouts"
+)
+
+type LogInProps struct {
+	Values map[string]string
+	Errors map[string]string
+}
+
+templ LogIn(props LogInProps) {
+	@layouts.Base(layouts.BaseProps{
+		Title: "Log In",
+	}) {
+		<h1>
+			Log In
+		</h1>
+		@templ.Fragment("form") {
+			<form id="form" hx-post="/log-in" hx-swap="outerHTML">
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "Email",
+					}) {
+						Email
+					}
+					@input.Input(input.Props{
+						ID:       "Email",
+						Name:     "Email",
+						Type:     input.TypeEmail,
+						Value:    props.Values["Email"],
+						HasError: props.Errors["Email"] != "",
+					})
+					if props.Errors["Email"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["Email"] }
+						}
+					}
+				}
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "Password",
+					}) {
+						Password
+					}
+					@input.Input(input.Props{
+						ID:       "Password",
+						Name:     "Password",
+						Type:     input.TypePassword,
+						Value:    props.Values["Password"],
+						HasError: props.Errors["Password"] != "",
+					})
+					if props.Errors["Password"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["Password"] }
+						}
+					}
+				}
+				if props.Errors["_Error"] != "" {
+					@alert.Error(props.Errors["_Error"])
+				}
+				@button.Button(button.Props{
+					Type: button.TypeSubmit,
+				}) {
+					Submit
+				}
+				@button.Button(button.Props{
+					Type:    button.TypeButton,
+					Variant: button.VariantLink,
+					Href:    "/password-reset",
+				}) {
+					Reset Password
+				}
+			</form>
+		}
+	}
+}
