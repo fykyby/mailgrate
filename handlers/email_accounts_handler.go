@@ -138,3 +138,11 @@ func EmailAccountDelete(c *echo.Context) error {
 
 	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
 }
+
+func EmailAccountJobMigrateStart(c *echo.Context) error {
+	return c.String(200, "ok")
+}
+
+func EmailAccountJobMigrateStop(c *echo.Context) error {
+	return c.String(200, "ok")
+}

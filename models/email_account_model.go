@@ -111,3 +111,17 @@ func DeleteEmailAccount(ctx context.Context, id int) error {
 
 	return nil
 }
+
+func UpdateEmailAccountStatus(ctx context.Context, id int, status JobStatus) error {
+	_, err := db.Bun.
+		NewUpdate().
+		Model(new(EmailAccount)).
+		Set("status = ?", status).
+		Where("id = ?", id).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

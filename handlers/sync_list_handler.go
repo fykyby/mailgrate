@@ -192,3 +192,11 @@ func SyncListDelete(c *echo.Context) error {
 
 	return helpers.Redirect(c, "/app/sync-lists")
 }
+
+func SyncListJobMigrateStart(c *echo.Context) error {
+	return c.String(200, "ok")
+}
+
+func SyncListJobMigrateStop(c *echo.Context) error {
+	return c.String(200, "ok")
+}

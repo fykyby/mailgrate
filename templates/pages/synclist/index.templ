@@ -8,8 +8,6 @@ import (
 	"app/templates/components/icon"
 	"app/templates/components/table"
 	"app/templates/layouts"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"strconv"
 )
 
@@ -80,7 +78,7 @@ templ Index(props IndexProps) {
 							{ list.DestinationHost + ":" + strconv.Itoa(list.DestinationPort) }
 						}
 						@table.Cell() {
-							{ cases.Title(language.Und).String(string(list.Status)) }
+							TODO
 						}
 						@table.Cell(table.CellProps{
 							Class: "text-right",

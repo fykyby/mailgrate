@@ -18,7 +18,6 @@ type SyncList struct {
 	SourcePort      int
 	DestinationHost string
 	DestinationPort int
-	Status          JobStatus
 }
 
 type SyncListsPaginated struct {
@@ -34,7 +33,6 @@ func CreateSyncList(ctx context.Context, userID int, name string, sourceHost str
 		SourcePort:      sourcePort,
 		DestinationHost: destinationHost,
 		DestinationPort: destinationPort,
-		Status:          JobStatusNone,
 	}
 
 	_, err := db.Bun.
