@@ -14,6 +14,7 @@ type JobType string
 type JobStatus string
 
 const (
+	JobStatusNone        JobStatus = "none"
 	JobStatusPending     JobStatus = "pending"
 	JobStatusRunning     JobStatus = "running"
 	JobStatusInterrupted JobStatus = "interrupted"
@@ -24,17 +25,15 @@ const (
 type Job struct {
 	bun.BaseModel `bun:"table:jobs"`
 
-	ID           int `bun:",pk,autoincrement"`
-	UserID       int
-	RelatedTable string `bun:",nullzero"`
-	RelatedID    int    `bun:",nullzero"`
-	Type         JobType
-	Status       JobStatus
-	Payload      json.RawMessage `bun:"type:jsonb"` // Payload is mutable and represents job progress
-	CreatedAt    time.Time       `bun:",nullzero,default:current_timestamp"`
-	StartedAt    time.Time       `bun:",nullzero"`
-	FinishedAt   time.Time       `bun:",nullzero"`
-	Error        string          `bun:",nullzero"`
+	ID         int `bun:",pk,autoincrement"`
+	UserID     int
+	Type       JobType
+	Status     JobStatus
+	Payload    json.RawMessage `bun:"type:jsonb"` // Payload is mutable and represents job progress
+	CreatedAt  time.Time       `bun:",nullzero,default:current_timestamp"`
+	StartedAt  time.Time       `bun:",nullzero"`
+	FinishedAt time.Time       `bun:",nullzero"`
+	Error      string          `bun:",nullzero"`
 }
 
 func CreateJob(ctx context.Context, userID int, jobType JobType, payload json.RawMessage) (*Job, error) {
@@ -58,12 +57,10 @@ func CreateJob(ctx context.Context, userID int, jobType JobType, payload json.Ra
 
 func CreateJobWithRelated(ctx context.Context, userID int, jobType JobType, relatedTable string, relatedID int, payload json.RawMessage) (*Job, error) {
 	job := &Job{
-		UserID:       userID,
-		Type:         jobType,
-		Status:       JobStatusPending,
-		Payload:      payload,
-		RelatedTable: relatedTable,
-		RelatedID:    relatedID,
+		UserID:  userID,
+		Type:    jobType,
+		Status:  JobStatusPending,
+		Payload: payload,
 	}
 
 	_, err := db.Bun.

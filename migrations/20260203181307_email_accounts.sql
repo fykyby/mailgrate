@@ -5,6 +5,7 @@ CREATE TABLE email_accounts (
   sync_list_id INTEGER NOT NULL,
   login VARCHAR(255) NOT NULL,
   password VARCHAR(255) NOT NULL,
+  status VARCHAR(255) NOT NULL,
   FOREIGN KEY (sync_list_id) REFERENCES sync_lists (id),
   CONSTRAINT email_accounts_sync_list_login_unique UNIQUE (sync_list_id, login)
 );

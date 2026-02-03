@@ -3,11 +3,14 @@ package synclist
 import (
 	"app/models"
 	"app/templates/components"
+	"app/templates/components/badge"
 	"app/templates/components/button"
 	"app/templates/components/dialog"
 	"app/templates/components/icon"
 	"app/templates/components/table"
 	"app/templates/layouts"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"strconv"
 )
 
@@ -80,6 +83,13 @@ templ Show(props ShowProps) {
 				}
 			}
 		}
+		<div>
+			@badge.Badge(badge.Props{
+				Variant: badge.VariantOutline,
+			}) {
+				Status: { cases.Title(language.Und).String(string(props.List.Status)) }
+			}
+		</div>
 		@table.Table() {
 			@table.Header() {
 				@table.Row() {
@@ -89,7 +99,10 @@ templ Show(props ShowProps) {
 						ID
 					}
 					@table.Head() {
-						Login
+						User
+					}
+					@table.Head() {
+						Status
 					}
 					@table.Head(table.HeadProps{
 						Class: "w-0 text-right",
@@ -106,6 +119,13 @@ templ Show(props ShowProps) {
 						}
 						@table.Cell() {
 							{ account.Login }
+						}
+						@table.Cell() {
+							@badge.Badge(badge.Props{
+								Variant: badge.VariantOutline,
+							}) {
+								{ cases.Title(language.Und).String(string(account.Status)) }
+							}
 						}
 						@table.Cell(table.CellProps{
 							Class: "text-right",

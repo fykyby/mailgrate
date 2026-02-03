@@ -15,6 +15,7 @@ type EmailAccount struct {
 	SyncListID int
 	Login      string
 	Password   string
+	Status     JobStatus
 }
 
 type EmailAccountsPaginated struct {
@@ -35,6 +36,7 @@ func CreateEmailAccount(ctx context.Context, syncListID int, login string, passw
 		SyncListID: syncListID,
 		Login:      login,
 		Password:   password,
+		Status:     JobStatusNone,
 	}
 
 	_, err := db.Bun.

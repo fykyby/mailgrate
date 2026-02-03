@@ -8,6 +8,7 @@ CREATE TABLE sync_lists (
   source_port INT NOT NULL,
   destination_host VARCHAR(255) NOT NULL,
   destination_port INT NOT NULL,
+  status VARCHAR(255) NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users (id),
   CONSTRAINT sync_lists_user_name_unique UNIQUE (user_id, name)
 );
