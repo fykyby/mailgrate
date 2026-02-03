@@ -54,6 +54,16 @@ templ AppSidebar() {
 							}
 						}
 					}
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Href: "/app/sync-lists",
+							}) {
+								@icon.List(icon.Props{Class: "size-4"})
+								<span>Sync Lists</span>
+							}
+						}
+					}
 				}
 			}
 			@sidebar.Separator(sidebar.SeparatorProps{

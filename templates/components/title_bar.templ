@@ -1,0 +1,28 @@
+package components
+
+import (
+	"app/templates/components/button"
+	"app/templates/components/icon"
+)
+
+type TitleBarProps struct {
+	Title       string
+	PreviousURL string
+}
+
+templ TitleBar(props TitleBarProps) {
+	<div class="flex items-center gap-2">
+		if props.PreviousURL != "" {
+			@button.Button(button.Props{
+				Href:    props.PreviousURL,
+				Variant: button.VariantGhost,
+				Size:    button.SizeIcon,
+			}) {
+				@icon.ChevronLeft()
+			}
+		} else {
+			<div class="h-[45px] -ml-2"></div>
+		}
+		<h1>{ props.Title }</h1>
+	</div>
+}

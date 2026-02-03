@@ -24,15 +24,17 @@ const (
 type Job struct {
 	bun.BaseModel `bun:"table:jobs"`
 
-	ID         int `bun:",pk,autoincrement"`
-	UserID     int
-	Type       JobType
-	Status     JobStatus
-	Payload    json.RawMessage `bun:"type:jsonb"` // Payload is mutable and represents job progress
-	CreatedAt  time.Time       `bun:",nullzero,default:current_timestamp"`
-	StartedAt  time.Time       `bun:",nullzero"`
-	FinishedAt time.Time       `bun:",nullzero"`
-	Error      string          `bun:",nullzero"`
+	ID           int `bun:",pk,autoincrement"`
+	UserID       int
+	RelatedTable string `bun:",nullzero"`
+	RelatedID    int    `bun:",nullzero"`
+	Type         JobType
+	Status       JobStatus
+	Payload      json.RawMessage `bun:"type:jsonb"` // Payload is mutable and represents job progress
+	CreatedAt    time.Time       `bun:",nullzero,default:current_timestamp"`
+	StartedAt    time.Time       `bun:",nullzero"`
+	FinishedAt   time.Time       `bun:",nullzero"`
+	Error        string          `bun:",nullzero"`
 }
 
 func CreateJob(ctx context.Context, userID int, jobType JobType, payload json.RawMessage) (*Job, error) {
@@ -41,6 +43,27 @@ func CreateJob(ctx context.Context, userID int, jobType JobType, payload json.Ra
 		Type:    jobType,
 		Status:  JobStatusPending,
 		Payload: payload,
+	}
+
+	_, err := db.Bun.
+		NewInsert().
+		Model(job).
+		Exec(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return job, nil
+}
+
+func CreateJobWithRelated(ctx context.Context, userID int, jobType JobType, relatedTable string, relatedID int, payload json.RawMessage) (*Job, error) {
+	job := &Job{
+		UserID:       userID,
+		Type:         jobType,
+		Status:       JobStatusPending,
+		Payload:      payload,
+		RelatedTable: relatedTable,
+		RelatedID:    relatedID,
 	}
 
 	_, err := db.Bun.
@@ -103,6 +126,19 @@ func FindJobsByIDs(ctx context.Context, ids []int) ([]*Job, error) {
 	return jobs, err
 }
 
+func FindJobsByRelated(ctx context.Context, relatedTable string, relatedID int) ([]*Job, error) {
+	jobs := make([]*Job, 0)
+
+	err := db.Bun.
+		NewSelect().
+		Model(&jobs).
+		Where("related_table = ?", relatedTable).
+		Where("related_id = ?", relatedID).
+		Scan(ctx)
+
+	return jobs, err
+}
+
 func FindPendingJob(ctx context.Context) (*Job, error) {
 	job := new(Job)
 
@@ -117,7 +153,7 @@ func FindPendingJob(ctx context.Context) (*Job, error) {
 	return job, err
 }
 
-func UpdateJob(ctx context.Context, job *Job) (*Job, error) {
+func UpdateJob(ctx context.Context, job *Job) error {
 	_, err := db.Bun.
 		NewUpdate().
 		Model(job).
@@ -125,13 +161,13 @@ func UpdateJob(ctx context.Context, job *Job) (*Job, error) {
 		OmitZero().
 		Exec(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return job, nil
+	return nil
 }
 
-func UpdateJobs(ctx context.Context, jobs []*Job) ([]*Job, error) {
+func UpdateJobs(ctx context.Context, jobs []*Job) error {
 	_, err := db.Bun.
 		NewUpdate().
 		Model(&jobs).
@@ -140,8 +176,8 @@ func UpdateJobs(ctx context.Context, jobs []*Job) ([]*Job, error) {
 		Bulk().
 		Exec(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return jobs, nil
+	return nil
 }

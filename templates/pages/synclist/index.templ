@@ -1,0 +1,131 @@
+package synclist
+
+import (
+	"app/models"
+	"app/templates/components"
+	"app/templates/components/button"
+	"app/templates/components/dialog"
+	"app/templates/components/icon"
+	"app/templates/components/table"
+	"app/templates/layouts"
+	"strconv"
+)
+
+type IndexProps struct {
+	PaginatedSyncLists *models.SyncListsPaginated
+}
+
+templ Index(props IndexProps) {
+	@layouts.App(layouts.AppProps{
+		Title: "Sync Lists",
+	}) {
+		@components.TitleBar(components.TitleBarProps{
+			Title: "Sync Lists",
+		})
+		@components.ActionBar() {
+			@button.Button(button.Props{
+				Href: "/app/sync-lists/new",
+			}) {
+				New
+			}
+		}
+		@table.Table() {
+			@table.Header() {
+				@table.Row() {
+					@table.Head(table.HeadProps{
+						Class: "w-0",
+					}) {
+						ID
+					}
+					@table.Head() {
+						Name
+					}
+					@table.Head() {
+						Source
+					}
+					@table.Head() {
+						Destination
+					}
+					@table.Head(table.HeadProps{
+						Class: "w-0 text-right",
+					}) {
+						Actions
+					}
+				}
+			}
+			@table.Body() {
+				for _, list := range props.PaginatedSyncLists.SyncLists {
+					@table.Row() {
+						@table.Cell() {
+							{ list.ID }
+						}
+						@table.Cell() {
+							@button.Button(button.Props{
+								Href:    "/app/sync-lists/" + strconv.Itoa(list.ID),
+								Variant: button.VariantLink,
+								Class:   "p-0 m-0",
+							}) {
+								{ list.Name }
+							}
+						}
+						@table.Cell() {
+							{ list.SourceHost + ":" + strconv.Itoa(list.SourcePort) }
+						}
+						@table.Cell() {
+							{ list.DestinationHost + ":" + strconv.Itoa(list.DestinationPort) }
+						}
+						@table.Cell(table.CellProps{
+							Class: "text-right",
+						}) {
+							@dialog.Dialog(dialog.Props{
+								ID: "delete-sync-list-" + strconv.Itoa(list.ID),
+							}) {
+								@dialog.Trigger() {
+									@button.Button(button.Props{
+										Variant: button.VariantOutline,
+										Size:    button.SizeIcon,
+									}) {
+										@icon.Trash()
+									}
+								}
+								@dialog.Content(dialog.ContentProps{
+									Class: "max-w-md",
+								}) {
+									@dialog.Header() {
+										@dialog.Title() {
+											Are you sure?
+										}
+										@dialog.Description() {
+											This action will permanently delete "{ list.Name }".
+										}
+									}
+									<div id={ "delete-sync-list-" + strconv.Itoa(list.ID) + "-error" }></div>
+									@dialog.Footer() {
+										@dialog.Close() {
+											@button.Button(button.Props{
+												Variant: button.VariantOutline,
+											}) {
+												Cancel
+											}
+										}
+										@button.Button(button.Props{
+											Variant: button.VariantDestructive,
+											Attributes: templ.Attributes{
+												"hx-delete": "/app/sync-lists/" + strconv.Itoa(list.ID),
+												"hx-target": "#delete-sync-list-" + strconv.Itoa(list.ID) + "-error",
+												"hx-swap":   "outerHTML",
+											},
+										}) {
+											Delete
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		@components.AppPagination(props.PaginatedSyncLists.Pagination)
+	}
+}

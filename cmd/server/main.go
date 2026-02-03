@@ -9,6 +9,7 @@ import (
 	"app/helpers"
 	"app/templates/pages"
 	"context"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -44,6 +45,7 @@ func main() {
 	})
 
 	e.HTTPErrorHandler = func(c *echo.Context, err error) {
+		log.Println(err)
 		if errorsx.IsNotFoundError(err) {
 			helpers.Render(c, http.StatusNotFound, pages.Error(helpers.MsgErrNotFound))
 		} else {

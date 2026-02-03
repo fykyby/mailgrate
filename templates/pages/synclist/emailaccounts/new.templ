@@ -1,0 +1,82 @@
+package emailaccounts
+
+import (
+	"app/models"
+	"app/templates/components"
+	"app/templates/components/alert"
+	"app/templates/components/button"
+	"app/templates/components/form"
+	"app/templates/components/input"
+	"app/templates/layouts"
+	"strconv"
+)
+
+type NewProps struct {
+	List   *models.SyncList
+	Values map[string]string
+	Errors map[string]string
+}
+
+templ New(props NewProps) {
+	@layouts.App(layouts.AppProps{
+		Title: props.List.Name + " - Add Email Account",
+	}) {
+		@components.TitleBar(components.TitleBarProps{
+			Title:       "Add Email Account - " + props.List.Name,
+			PreviousURL: "/app/sync-lists/" + strconv.Itoa(props.List.ID),
+		})
+		@templ.Fragment("form") {
+			<form id="form" hx-post={ "/app/sync-lists/" + strconv.Itoa(props.List.ID) + "/email-accounts" } hx-swap="outerHTML">
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "Login",
+					}) {
+						Login
+					}
+					@input.Input(input.Props{
+						ID:       "Login",
+						Name:     "Login",
+						Value:    props.Values["Login"],
+						HasError: props.Errors["Login"] != "",
+					})
+					if props.Errors["Login"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["Login"] }
+						}
+					}
+				}
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "Password",
+					}) {
+						Password
+					}
+					@input.Input(input.Props{
+						ID:       "Password",
+						Name:     "Password",
+						Type:     input.TypePassword,
+						Value:    props.Values["Password"],
+						HasError: props.Errors["Password"] != "",
+					})
+					if props.Errors["Password"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["Password"] }
+						}
+					}
+				}
+				if props.Errors["_Error"] != "" {
+					@alert.Error(props.Errors["_Error"])
+				}
+				@button.Button(button.Props{
+					Type: button.TypeSubmit,
+				}) {
+					Submit
+				}
+			</form>
+		}
+	}
+}

@@ -1,0 +1,68 @@
+package components
+
+import (
+	"app/helpers"
+	"app/templates/components/pagination"
+	"app/templates/utils"
+	"strconv"
+)
+
+templ AppPagination(props helpers.Pagination) {
+	if props.LastPage > 1 {
+		@pagination.Pagination() {
+			@pagination.Content() {
+				// Previous
+				@pagination.Item() {
+					@pagination.Previous(pagination.PreviousProps{
+						Href:     "?page=" + strconv.Itoa(max(1, props.Page-1)),
+						Disabled: props.Page == 1,
+					})
+				}
+				// First page + ellipsis
+				if props.Page > 3 {
+					@pagination.Item() {
+						@pagination.Link(pagination.LinkProps{
+							Href: "?page=1",
+						}) {
+							1
+						}
+					}
+					@pagination.Item() {
+						@pagination.Ellipsis()
+					}
+				}
+				// Page window
+				for _, page := range utils.PageRange(props.Page, props.LastPage) {
+					@pagination.Item() {
+						@pagination.Link(pagination.LinkProps{
+							Href:     "?page=" + strconv.Itoa(page),
+							IsActive: page == props.Page,
+						}) {
+							{ page }
+						}
+					}
+				}
+				// Ellipsis + last page
+				if props.Page < props.LastPage-2 {
+					@pagination.Item() {
+						@pagination.Ellipsis()
+					}
+					@pagination.Item() {
+						@pagination.Link(pagination.LinkProps{
+							Href: "?page=" + strconv.Itoa(props.LastPage),
+						}) {
+							{ props.LastPage }
+						}
+					}
+				}
+				// Next
+				@pagination.Item() {
+					@pagination.Next(pagination.NextProps{
+						Href:     "?page=" + strconv.Itoa(min(props.LastPage, props.Page+1)),
+						Disabled: props.Page == props.LastPage,
+					})
+				}
+			}
+		}
+	}
+}

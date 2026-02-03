@@ -36,4 +36,16 @@ func RegisterRoutes(e *echo.Echo) {
 	ar.Use(middlewarex.WithAuthRequired)
 	ar.POST("/log-out", handlers.UserLogOut)
 	ar.GET("/app", handlers.DashboardShow)
+
+	ar.GET("/app/sync-lists", handlers.SyncListIndex)
+	ar.GET("/app/sync-lists/new", handlers.SyncListNew)
+	ar.POST("/app/sync-lists", handlers.SyncListCreate)
+	ar.DELETE("/app/sync-lists/:id", handlers.SyncListDelete)
+	ar.GET("/app/sync-lists/:id", handlers.SyncListShow)
+	ar.GET("/app/sync-lists/:id/edit", handlers.SyncListEdit)
+	ar.PUT("/app/sync-lists/:id", handlers.SyncListUpdate)
+
+	ar.GET("/app/sync-lists/:id/email-accounts/new", handlers.EmailAccountNew)
+	ar.POST("/app/sync-lists/:id/email-accounts", handlers.EmailAccountCreate)
+	ar.DELETE("/app/sync-lists/:listID/email-accounts/:id", handlers.EmailAccountDelete)
 }

@@ -1,0 +1,164 @@
+package synclist
+
+import (
+	"app/models"
+	"app/templates/components"
+	"app/templates/components/button"
+	"app/templates/components/dialog"
+	"app/templates/components/icon"
+	"app/templates/components/table"
+	"app/templates/layouts"
+	"strconv"
+)
+
+type ShowProps struct {
+	List                   *models.SyncList
+	PaginatedEmailAccounts *models.EmailAccountsPaginated
+}
+
+templ Show(props ShowProps) {
+	@layouts.App(layouts.AppProps{
+		Title: "Sync List - " + props.List.Name,
+	}) {
+		@components.TitleBar(components.TitleBarProps{
+			Title:       "Sync List - " + props.List.Name,
+			PreviousURL: "/app/sync-lists",
+		})
+		@components.ActionBar() {
+			@button.Button(button.Props{
+				Href: "/app/sync-lists/" + strconv.Itoa(props.List.ID) + "/email-accounts/new",
+			}) {
+				Add Email Account
+			}
+			@button.Button(button.Props{
+				Href:    "/app/sync-lists/" + strconv.Itoa(props.List.ID) + "/edit",
+				Variant: button.VariantOutline,
+			}) {
+				Edit
+			}
+			@dialog.Dialog(dialog.Props{
+				ID: "delete-sync-list-" + strconv.Itoa(props.List.ID),
+			}) {
+				@dialog.Trigger() {
+					@button.Button(button.Props{
+						Variant: button.VariantOutline,
+					}) {
+						Delete
+					}
+				}
+				@dialog.Content(dialog.ContentProps{
+					Class: "max-w-md",
+				}) {
+					@dialog.Header() {
+						@dialog.Title() {
+							Are you sure?
+						}
+						@dialog.Description() {
+							This action will permanently delete "{ props.List.Name }".
+						}
+					}
+					<div id={ "delete-sync-list-" + strconv.Itoa(props.List.ID) + "-error" }></div>
+					@dialog.Footer() {
+						@dialog.Close() {
+							@button.Button(button.Props{
+								Variant: button.VariantOutline,
+							}) {
+								Cancel
+							}
+						}
+						@button.Button(button.Props{
+							Variant: button.VariantDestructive,
+							Attributes: templ.Attributes{
+								"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.List.ID),
+								"hx-target": "#delete-sync-list-" + strconv.Itoa(props.List.ID) + "-error",
+								"hx-swap":   "outerHTML",
+							},
+						}) {
+							Delete
+						}
+					}
+				}
+			}
+		}
+		@table.Table() {
+			@table.Header() {
+				@table.Row() {
+					@table.Head(table.HeadProps{
+						Class: "w-0",
+					}) {
+						ID
+					}
+					@table.Head() {
+						Login
+					}
+					@table.Head(table.HeadProps{
+						Class: "w-0 text-right",
+					}) {
+						Actions
+					}
+				}
+			}
+			@table.Body() {
+				for _, account := range props.PaginatedEmailAccounts.EmailAccounts {
+					@table.Row() {
+						@table.Cell() {
+							{ account.ID }
+						}
+						@table.Cell() {
+							{ account.Login }
+						}
+						@table.Cell(table.CellProps{
+							Class: "text-right",
+						}) {
+							@dialog.Dialog(dialog.Props{
+								ID: "delete-email-account-" + strconv.Itoa(account.ID),
+							}) {
+								@dialog.Trigger() {
+									@button.Button(button.Props{
+										Variant: button.VariantOutline,
+										Size:    button.SizeIcon,
+									}) {
+										@icon.Trash()
+									}
+								}
+								@dialog.Content(dialog.ContentProps{
+									Class: "max-w-md",
+								}) {
+									@dialog.Header() {
+										@dialog.Title() {
+											Are you sure?
+										}
+										@dialog.Description() {
+											This action will permanently delete "{ account.Login }" from "{ props.List.Name }".
+										}
+									}
+									<div id={ "delete-email-account-" + strconv.Itoa(account.ID) + "-error" }></div>
+									@dialog.Footer() {
+										@dialog.Close() {
+											@button.Button(button.Props{
+												Variant: button.VariantOutline,
+											}) {
+												Cancel
+											}
+										}
+										@button.Button(button.Props{
+											Variant: button.VariantDestructive,
+											Attributes: templ.Attributes{
+												"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.List.ID) + "/email-accounts/" + strconv.Itoa(account.ID),
+												"hx-target": "#delete-email-account-" + strconv.Itoa(account.ID) + "-error",
+												"hx-swap":   "outerHTML",
+											},
+										}) {
+											Delete
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		@components.AppPagination(props.PaginatedEmailAccounts.Pagination)
+	}
+}

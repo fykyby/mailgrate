@@ -3,6 +3,8 @@
 CREATE TABLE jobs (
   id SERIAL PRIMARY KEY,
   user_id INT NOT NULL,
+  related_table VARCHAR(255) DEFAULT NULL,
+  related_id INT DEFAULT NULL,
   type VARCHAR(255) NOT NULL,
   status VARCHAR(255) NOT NULL,
   payload JSONB,

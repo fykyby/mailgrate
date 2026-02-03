@@ -171,7 +171,7 @@ func updateJob(ctx context.Context, job *models.Job, handler JobHandler) error {
 		}
 	}
 
-	_, err := models.UpdateJob(ctx, job)
+	err := models.UpdateJob(ctx, job)
 	if err != nil {
 		slog.Error("worker: failed to update job", "job", job.ID, "error", err.Error())
 		return err

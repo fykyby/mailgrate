@@ -13,6 +13,7 @@ var (
 	MsgErrBadCredentials     = "Invalid email or password"
 	MsgErrJobQueueFull       = "Job queue is full"
 	MsgErrWorkersUnavailable = "No available workers"
+	MsgErrForbidden          = "Unauthorized"
 
 	MsgSuccessGeneric     = "Action completed successfully"
 	MsgSuccessMessageSent = "Message sent"

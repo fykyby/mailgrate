@@ -7,7 +7,9 @@ templ Error(message string) {
 		Variant: VariantDestructive,
 	}) {
 		@icon.TriangleAlert()
-		@Title() {
+		@Title(TitleProps{
+			Class: "text-left w-min",
+		}) {
 			Error
 		}
 		@Description() {

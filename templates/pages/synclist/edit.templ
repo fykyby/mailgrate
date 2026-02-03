@@ -1,0 +1,143 @@
+package synclist
+
+import (
+	"app/models"
+	"app/templates/components"
+	"app/templates/components/alert"
+	"app/templates/components/button"
+	"app/templates/components/form"
+	"app/templates/components/input"
+	"app/templates/layouts"
+	"strconv"
+)
+
+type EditProps struct {
+	List   *models.SyncList
+	Values map[string]string
+	Errors map[string]string
+}
+
+templ Edit(props EditProps) {
+	@layouts.App(layouts.AppProps{
+		Title: "Edit Sync List - " + props.List.Name,
+	}) {
+		@components.TitleBar(components.TitleBarProps{
+			Title:       "Edit Sync List - " + props.List.Name,
+			PreviousURL: "/app/sync-lists/" + strconv.Itoa(props.List.ID),
+		})
+		@templ.Fragment("form") {
+			<form id="form" hx-put={ "/app/sync-lists/" + strconv.Itoa(props.List.ID) } hx-swap="outerHTML">
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "Name",
+					}) {
+						Name
+					}
+					@input.Input(input.Props{
+						ID:       "Name",
+						Name:     "Name",
+						Value:    props.Values["Name"],
+						HasError: props.Errors["Name"] != "",
+					})
+					if props.Errors["Name"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["Name"] }
+						}
+					}
+				}
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "SourceHost",
+					}) {
+						Source Host
+					}
+					@input.Input(input.Props{
+						ID:       "SourceHost",
+						Name:     "SourceHost",
+						Value:    props.Values["SourceHost"],
+						HasError: props.Errors["SourceHost"] != "",
+					})
+					if props.Errors["SourceHost"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["SourceHost"] }
+						}
+					}
+				}
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "SourcePort",
+					}) {
+						Source Port
+					}
+					@input.Input(input.Props{
+						ID:       "SourcePort",
+						Name:     "SourcePort",
+						Type:     input.TypeNumber,
+						Value:    props.Values["SourcePort"],
+						HasError: props.Errors["SourcePort"] != "",
+					})
+					if props.Errors["SourcePort"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["SourcePort"] }
+						}
+					}
+				}
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "DestinationHost",
+					}) {
+						Destination Host
+					}
+					@input.Input(input.Props{
+						ID:       "DestinationHost",
+						Name:     "DestinationHost",
+						Value:    props.Values["DestinationHost"],
+						HasError: props.Errors["DestinationHost"] != "",
+					})
+					if props.Errors["DestinationHost"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["DestinationHost"] }
+						}
+					}
+				}
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "DestinationPort",
+					}) {
+						Destination Port
+					}
+					@input.Input(input.Props{
+						ID:       "DestinationPort",
+						Name:     "DestinationPort",
+						Type:     input.TypeNumber,
+						Value:    props.Values["DestinationPort"],
+						HasError: props.Errors["DestinationPort"] != "",
+					})
+					if props.Errors["DestinationPort"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["DestinationPort"] }
+						}
+					}
+				}
+				if props.Errors["_Error"] != "" {
+					@alert.Error(props.Errors["_Error"])
+				}
+				@button.Button(button.Props{
+					Type: button.TypeSubmit,
+				}) {
+					Submit
+				}
+			</form>
+		}
+	}
+}
