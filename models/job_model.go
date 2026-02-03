@@ -25,15 +25,17 @@ const (
 type Job struct {
 	bun.BaseModel `bun:"table:jobs"`
 
-	ID         int `bun:",pk,autoincrement"`
-	UserID     int
-	Type       JobType
-	Status     JobStatus
-	Payload    json.RawMessage `bun:"type:jsonb"` // Payload is mutable and represents job progress
-	CreatedAt  time.Time       `bun:",nullzero,default:current_timestamp"`
-	StartedAt  time.Time       `bun:",nullzero"`
-	FinishedAt time.Time       `bun:",nullzero"`
-	Error      string          `bun:",nullzero"`
+	ID           int `bun:",pk,autoincrement"`
+	UserID       int
+	RelatedTable string `bun:",nullzero"`
+	RelatedID    int    `bun:",nullzero"`
+	Type         JobType
+	Status       JobStatus
+	Payload      json.RawMessage `bun:"type:jsonb"` // Payload is mutable and represents job progress
+	CreatedAt    time.Time       `bun:",nullzero,default:current_timestamp"`
+	StartedAt    time.Time       `bun:",nullzero"`
+	FinishedAt   time.Time       `bun:",nullzero"`
+	Error        string          `bun:",nullzero"`
 }
 
 func CreateJob(ctx context.Context, userID int, jobType JobType, payload json.RawMessage) (*Job, error) {
@@ -57,10 +59,12 @@ func CreateJob(ctx context.Context, userID int, jobType JobType, payload json.Ra
 
 func CreateJobWithRelated(ctx context.Context, userID int, jobType JobType, relatedTable string, relatedID int, payload json.RawMessage) (*Job, error) {
 	job := &Job{
-		UserID:  userID,
-		Type:    jobType,
-		Status:  JobStatusPending,
-		Payload: payload,
+		UserID:       userID,
+		RelatedTable: relatedTable,
+		RelatedID:    relatedID,
+		Type:         jobType,
+		Status:       JobStatusPending,
+		Payload:      payload,
 	}
 
 	_, err := db.Bun.
@@ -131,6 +135,19 @@ func FindJobsByRelated(ctx context.Context, relatedTable string, relatedID int) 
 		Model(&jobs).
 		Where("related_table = ?", relatedTable).
 		Where("related_id = ?", relatedID).
+		Scan(ctx)
+
+	return jobs, err
+}
+
+func FindJobsByRelatedMany(ctx context.Context, relatedTable string, relatedIDs []int) ([]*Job, error) {
+	jobs := make([]*Job, 0)
+
+	err := db.Bun.
+		NewSelect().
+		Model(&jobs).
+		Where("related_table = ?", relatedTable).
+		Where("related_id IN (?)", bun.In(relatedIDs)).
 		Scan(ctx)
 
 	return jobs, err

@@ -3,7 +3,6 @@ package jobs
 import (
 	"app/models"
 	"context"
-	"errors"
 	"strings"
 	"time"
 
@@ -14,8 +13,6 @@ import (
 var MigrateAccountType models.JobType = "migrate_account"
 
 type MigrateAccount struct {
-	SyncListID        int
-	EmailAccountID    int
 	Source            string
 	Destination       string
 	Login             string
@@ -26,7 +23,6 @@ type MigrateAccount struct {
 
 func NewMigrateAccount(syncListID int, emailAccountID int, src string, dst string, login string, password string) *MigrateAccount {
 	return &MigrateAccount{
-		EmailAccountID:    emailAccountID,
 		Source:            src,
 		Destination:       dst,
 		Login:             login,
@@ -37,19 +33,6 @@ func NewMigrateAccount(syncListID int, emailAccountID int, src string, dst strin
 }
 
 func (j *MigrateAccount) Run(ctx context.Context) (err error) {
-	defer func() {
-		switch {
-		case errors.Is(err, context.Canceled):
-			_ = models.UpdateEmailAccountStatus(ctx, j.EmailAccountID, models.JobStatusInterrupted)
-		case err != nil:
-			_ = models.UpdateEmailAccountStatus(ctx, j.EmailAccountID, models.JobStatusFailed)
-		default:
-			_ = models.UpdateEmailAccountStatus(ctx, j.EmailAccountID, models.JobStatusCompleted)
-		}
-	}()
-
-	_ = models.UpdateEmailAccountStatus(ctx, j.EmailAccountID, models.JobStatusRunning)
-
 	sourceClient, err := client.DialTLS(j.Source, nil)
 	if err != nil {
 		return err

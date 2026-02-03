@@ -15,7 +15,6 @@ type EmailAccount struct {
 	SyncListID int
 	Login      string
 	Password   string
-	Status     JobStatus
 }
 
 type EmailAccountsPaginated struct {
@@ -23,20 +22,11 @@ type EmailAccountsPaginated struct {
 	Pagination    helpers.Pagination
 }
 
-type EmailAccountsJobs struct {
-	bun.BaseModel `bun:"table:email_accounts_jobs"`
-
-	ID             int `bun:",pk,autoincrement"`
-	EmailAccountID int
-	JobID          int
-}
-
 func CreateEmailAccount(ctx context.Context, syncListID int, login string, password string) (*EmailAccount, error) {
 	emailAccount := &EmailAccount{
 		SyncListID: syncListID,
 		Login:      login,
 		Password:   password,
-		Status:     JobStatusNone,
 	}
 
 	_, err := db.Bun.
@@ -97,26 +87,29 @@ func FindEmailAccountsBySyncListIDPaginated(ctx context.Context, syncListID int,
 	return emailAccountsPaginated, nil
 }
 
+func FindEmailAccountsBySyncListID(ctx context.Context, syncListID int) ([]*EmailAccount, error) {
+	var emailAccounts []*EmailAccount
+
+	err := db.Bun.
+		NewSelect().
+		Model(&emailAccounts).
+		Where("sync_list_id = ?", syncListID).
+		Limit(helpers.PaginationLimit).
+		OrderBy("login", bun.OrderAsc).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return emailAccounts, nil
+}
+
 func DeleteEmailAccount(ctx context.Context, id int) error {
 	emailAccount := &EmailAccount{ID: id}
 
 	_, err := db.Bun.
 		NewDelete().
 		Model(emailAccount).
-		Where("id = ?", id).
-		Exec(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func UpdateEmailAccountStatus(ctx context.Context, id int, status JobStatus) error {
-	_, err := db.Bun.
-		NewUpdate().
-		Model(new(EmailAccount)).
-		Set("status = ?", status).
 		Where("id = ?", id).
 		Exec(ctx)
 	if err != nil {

@@ -15,32 +15,63 @@ import (
 )
 
 type ShowProps struct {
-	List                   *models.SyncList
+	SyncList               *models.SyncList
+	SyncListStatus         models.JobStatus
+	EmailAccountStatusMap  map[int]models.JobStatus
 	PaginatedEmailAccounts *models.EmailAccountsPaginated
 }
 
 templ Show(props ShowProps) {
 	@layouts.App(layouts.AppProps{
-		Title: "Sync List - " + props.List.Name,
+		Title: "Sync List - " + props.SyncList.Name,
 	}) {
 		@components.TitleBar(components.TitleBarProps{
-			Title:       "Sync List - " + props.List.Name,
+			Title:       "Sync List - " + props.SyncList.Name,
 			PreviousURL: "/app/sync-lists",
 		})
 		@components.ActionBar() {
-			@button.Button(button.Props{
-				Href: "/app/sync-lists/" + strconv.Itoa(props.List.ID) + "/email-accounts/new",
-			}) {
-				Add Email Account
+			if len(props.PaginatedEmailAccounts.EmailAccounts) > 0 {
+				if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
+					@button.Button(button.Props{
+						Attributes: templ.Attributes{
+							"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.ID) + "/migrate/start",
+							"hx-swap": "none",
+						},
+					}) {
+						Start
+					}
+				} else if props.SyncListStatus == models.JobStatusRunning || props.SyncListStatus == models.JobStatusPending {
+					@button.Button(button.Props{
+						Variant: button.VariantDestructive,
+						Attributes: templ.Attributes{
+							"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.ID) + "/migrate/stop",
+							"hx-swap": "none",
+						},
+					}) {
+						Stop
+					}
+				}
+				@button.Button(button.Props{
+					Variant: button.VariantOutline,
+					Href:    "/app/sync-lists/" + strconv.Itoa(props.SyncList.ID) + "/email-accounts/new",
+				}) {
+					Add Email Account
+				}
+			} else {
+				@button.Button(button.Props{
+					Href: "/app/sync-lists/" + strconv.Itoa(props.SyncList.ID) + "/email-accounts/new",
+				}) {
+					Add Email Account
+				}
 			}
 			@button.Button(button.Props{
-				Href:    "/app/sync-lists/" + strconv.Itoa(props.List.ID) + "/edit",
+				Href:    "/app/sync-lists/" + strconv.Itoa(props.SyncList.ID) + "/edit",
 				Variant: button.VariantOutline,
 			}) {
 				Edit
 			}
 			@dialog.Dialog(dialog.Props{
-				ID: "delete-sync-list-" + strconv.Itoa(props.List.ID),
+				ID: "delete-sync-list-" + strconv.Itoa(props.SyncList.ID),
 			}) {
 				@dialog.Trigger() {
 					@button.Button(button.Props{
@@ -57,10 +88,10 @@ templ Show(props ShowProps) {
 							Are you sure?
 						}
 						@dialog.Description() {
-							This action will permanently delete "{ props.List.Name }".
+							This action will permanently delete "{ props.SyncList.Name }".
 						}
 					}
-					<div id={ "delete-sync-list-" + strconv.Itoa(props.List.ID) + "-error" }></div>
+					<div id={ "delete-sync-list-" + strconv.Itoa(props.SyncList.ID) + "-error" }></div>
 					@dialog.Footer() {
 						@dialog.Close() {
 							@button.Button(button.Props{
@@ -72,8 +103,8 @@ templ Show(props ShowProps) {
 						@button.Button(button.Props{
 							Variant: button.VariantDestructive,
 							Attributes: templ.Attributes{
-								"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.List.ID),
-								"hx-target": "#delete-sync-list-" + strconv.Itoa(props.List.ID) + "-error",
+								"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.SyncList.ID),
+								"hx-target": "#delete-sync-list-" + strconv.Itoa(props.SyncList.ID) + "-error",
 								"hx-swap":   "outerHTML",
 							},
 						}) {
@@ -87,7 +118,7 @@ templ Show(props ShowProps) {
 			@badge.Badge(badge.Props{
 				Variant: badge.VariantOutline,
 			}) {
-				Status: TODO
+				Status: { cases.Title(language.Und).String(string(props.SyncListStatus)) }
 			}
 		</div>
 		@table.Table() {
@@ -113,6 +144,12 @@ templ Show(props ShowProps) {
 			}
 			@table.Body() {
 				for _, account := range props.PaginatedEmailAccounts.EmailAccounts {
+					{{
+						status, ok := props.EmailAccountStatusMap[account.ID]
+						if !ok {
+							status = models.JobStatusNone
+						}
+					}}
 					@table.Row() {
 						@table.Cell() {
 							{ account.ID }
@@ -124,12 +161,34 @@ templ Show(props ShowProps) {
 							@badge.Badge(badge.Props{
 								Variant: badge.VariantOutline,
 							}) {
-								{ cases.Title(language.Und).String(string(account.Status)) }
+								{ cases.Title(language.Und).String(string(status)) }
 							}
 						}
 						@table.Cell(table.CellProps{
-							Class: "text-right",
+							Class: "text-right flex gap-2",
 						}) {
+							if status != models.JobStatusRunning && status != models.JobStatusPending {
+								@button.Button(button.Props{
+									Size: button.SizeIcon,
+									Attributes: templ.Attributes{
+										"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.ID) + "/email-accounts/" + strconv.Itoa(account.ID) + "/migrate/start",
+										"hx-swap": "none",
+									},
+								}) {
+									@icon.Play()
+								}
+							} else if status == models.JobStatusRunning || status == models.JobStatusPending {
+								@button.Button(button.Props{
+									Variant: button.VariantDestructive,
+									Size:    button.SizeIcon,
+									Attributes: templ.Attributes{
+										"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.ID) + "/email-accounts/" + strconv.Itoa(account.ID) + "/migrate/stop",
+										"hx-swap": "none",
+									},
+								}) {
+									@icon.Square()
+								}
+							}
 							@dialog.Dialog(dialog.Props{
 								ID: "delete-email-account-" + strconv.Itoa(account.ID),
 							}) {
@@ -149,7 +208,7 @@ templ Show(props ShowProps) {
 											Are you sure?
 										}
 										@dialog.Description() {
-											This action will permanently delete "{ account.Login }" from "{ props.List.Name }".
+											This action will permanently delete "{ account.Login }" from "{ props.SyncList.Name }".
 										}
 									}
 									<div id={ "delete-email-account-" + strconv.Itoa(account.ID) + "-error" }></div>
@@ -164,7 +223,7 @@ templ Show(props ShowProps) {
 										@button.Button(button.Props{
 											Variant: button.VariantDestructive,
 											Attributes: templ.Attributes{
-												"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.List.ID) + "/email-accounts/" + strconv.Itoa(account.ID),
+												"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.SyncList.ID) + "/email-accounts/" + strconv.Itoa(account.ID),
 												"hx-target": "#delete-email-account-" + strconv.Itoa(account.ID) + "-error",
 												"hx-swap":   "outerHTML",
 											},

@@ -7,6 +7,7 @@ import (
 	"app/templates/components/alert"
 	"app/templates/pages"
 	"app/templates/pages/synclist"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -24,8 +25,25 @@ func SyncListIndex(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
 	}
 
+	listIDs := make([]int, len(syncLists.SyncLists))
+	for i, list := range syncLists.SyncLists {
+		listIDs[i] = list.ID
+	}
+
+	statuses, err := models.FindSyncListsStatus(c.Request().Context(), listIDs)
+	if err != nil {
+		log.Printf("Error finding sync list statuses: %v", err)
+		return err
+	}
+
+	jobStatusMap := make(map[int]models.JobStatus)
+	for _, status := range statuses {
+		jobStatusMap[status.ID] = status.Status
+	}
+
 	return helpers.Render(c, http.StatusOK, synclist.Index(synclist.IndexProps{
 		PaginatedSyncLists: syncLists,
+		SyncListStatusMap:  jobStatusMap,
 	}))
 }
 
@@ -89,8 +107,31 @@ func SyncListShow(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
+	accountIDs := make([]int, len(accounts.EmailAccounts))
+	for i, account := range accounts.EmailAccounts {
+		accountIDs[i] = account.ID
+	}
+
+	jobs, err := models.FindJobsByRelatedMany(c.Request().Context(), "email_accounts", accountIDs)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	accountStatusMap := make(map[int]models.JobStatus)
+	for _, job := range jobs {
+		accountStatusMap[job.RelatedID] = job.Status
+	}
+
+	listStatus, err := models.FindSyncListStatus(c.Request().Context(), list.ID)
+	if err != nil {
+		log.Println(err)
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
 	return helpers.Render(c, http.StatusOK, synclist.Show(synclist.ShowProps{
-		List:                   list,
+		SyncList:               list,
+		SyncListStatus:         listStatus.Status,
+		EmailAccountStatusMap:  accountStatusMap,
 		PaginatedEmailAccounts: accounts,
 	}))
 }

@@ -8,7 +8,7 @@ CREATE TABLE sync_lists (
   source_port INT NOT NULL,
   destination_host VARCHAR(255) NOT NULL,
   destination_port INT NOT NULL,
-  FOREIGN KEY (user_id) REFERENCES users (id),
+  FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
   CONSTRAINT sync_lists_user_name_unique UNIQUE (user_id, name)
 );
 

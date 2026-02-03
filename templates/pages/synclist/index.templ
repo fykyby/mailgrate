@@ -8,11 +8,14 @@ import (
 	"app/templates/components/icon"
 	"app/templates/components/table"
 	"app/templates/layouts"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"strconv"
 )
 
 type IndexProps struct {
 	PaginatedSyncLists *models.SyncListsPaginated
+	SyncListStatusMap  map[int]models.JobStatus
 }
 
 templ Index(props IndexProps) {
@@ -58,6 +61,12 @@ templ Index(props IndexProps) {
 			}
 			@table.Body() {
 				for _, list := range props.PaginatedSyncLists.SyncLists {
+					{{
+						status, ok := props.SyncListStatusMap[list.ID]
+						if !ok {
+							status = models.JobStatusNone
+						}
+					}}
 					@table.Row() {
 						@table.Cell() {
 							{ list.ID }
@@ -78,7 +87,7 @@ templ Index(props IndexProps) {
 							{ list.DestinationHost + ":" + strconv.Itoa(list.DestinationPort) }
 						}
 						@table.Cell() {
-							TODO
+							{ cases.Title(language.Und).String(string(status)) }
 						}
 						@table.Cell(table.CellProps{
 							Class: "text-right",

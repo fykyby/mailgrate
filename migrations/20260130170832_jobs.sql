@@ -3,6 +3,8 @@
 CREATE TABLE jobs (
   id SERIAL PRIMARY KEY,
   user_id INT NOT NULL,
+  related_table VARCHAR(255) DEFAULT NULL,
+  related_id INT DEFAULT NULL,
   type VARCHAR(255) NOT NULL,
   status VARCHAR(255) NOT NULL,
   payload JSONB,
@@ -10,7 +12,7 @@ CREATE TABLE jobs (
   started_at TIMESTAMP DEFAULT NULL,
   finished_at TIMESTAMP DEFAULT NULL,
   error VARCHAR(255) DEFAULT NULL,
-  FOREIGN KEY (user_id) REFERENCES users (id)
+  FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 CREATE FUNCTION notify_job_update () RETURNS TRIGGER AS $$
