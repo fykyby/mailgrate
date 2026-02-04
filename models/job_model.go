@@ -25,10 +25,10 @@ const (
 type Job struct {
 	bun.BaseModel `bun:"table:jobs"`
 
-	ID           int `bun:",pk,autoincrement"`
-	UserID       int
+	Id           int `bun:",pk,autoincrement"`
+	UserId       int
 	RelatedTable string `bun:",nullzero"`
-	RelatedID    int    `bun:",nullzero"`
+	RelatedId    int    `bun:",nullzero"`
 	Type         JobType
 	Status       JobStatus
 	Payload      json.RawMessage `bun:"type:jsonb"` // Payload is mutable and represents job progress
@@ -38,9 +38,9 @@ type Job struct {
 	Error        string          `bun:",nullzero"`
 }
 
-func CreateJob(ctx context.Context, userID int, jobType JobType, payload json.RawMessage) (*Job, error) {
+func CreateJob(ctx context.Context, userId int, jobType JobType, payload json.RawMessage) (*Job, error) {
 	job := &Job{
-		UserID:  userID,
+		UserId:  userId,
 		Type:    jobType,
 		Status:  JobStatusPending,
 		Payload: payload,
@@ -57,11 +57,11 @@ func CreateJob(ctx context.Context, userID int, jobType JobType, payload json.Ra
 	return job, nil
 }
 
-func CreateJobWithRelated(ctx context.Context, userID int, jobType JobType, relatedTable string, relatedID int, payload json.RawMessage) (*Job, error) {
+func CreateJobWithRelated(ctx context.Context, userId int, jobType JobType, relatedTable string, relatedId int, payload json.RawMessage) (*Job, error) {
 	job := &Job{
-		UserID:       userID,
+		UserId:       userId,
 		RelatedTable: relatedTable,
-		RelatedID:    relatedID,
+		RelatedId:    relatedId,
 		Type:         jobType,
 		Status:       JobStatusPending,
 		Payload:      payload,
@@ -78,12 +78,12 @@ func CreateJobWithRelated(ctx context.Context, userID int, jobType JobType, rela
 	return job, nil
 }
 
-func CreateJobs(ctx context.Context, userID int, jobType JobType, payload []json.RawMessage) ([]*Job, error) {
+func CreateJobs(ctx context.Context, userId int, jobType JobType, payload []json.RawMessage) ([]*Job, error) {
 	jobs := make([]*Job, 0, len(payload))
 
 	for _, p := range payload {
 		job := &Job{
-			UserID:  userID,
+			UserId:  userId,
 			Type:    jobType,
 			Status:  JobStatusPending,
 			Payload: p,
@@ -103,17 +103,17 @@ func CreateJobs(ctx context.Context, userID int, jobType JobType, payload []json
 	return jobs, nil
 }
 
-func CreateJobsWithRelated(ctx context.Context, userID int, jobType JobType, payloads []json.RawMessage, relatedTable string, relatedIDs []int) ([]*Job, error) {
+func CreateJobsWithRelated(ctx context.Context, userId int, jobType JobType, payloads []json.RawMessage, relatedTable string, relatedIds []int) ([]*Job, error) {
 	jobs := make([]*Job, 0, len(payloads))
 
 	for i, p := range payloads {
 		job := &Job{
-			UserID:       userID,
+			UserId:       userId,
 			Type:         jobType,
 			Status:       JobStatusPending,
 			Payload:      p,
 			RelatedTable: relatedTable,
-			RelatedID:    relatedIDs[i],
+			RelatedId:    relatedIds[i],
 		}
 
 		jobs = append(jobs, job)
@@ -154,39 +154,39 @@ func FindJobsByIDs(ctx context.Context, ids []int) ([]*Job, error) {
 	return jobs, err
 }
 
-func FindJobByRelated(ctx context.Context, relatedTable string, relatedID int) (*Job, error) {
+func FindJobByRelated(ctx context.Context, relatedTable string, relatedId int) (*Job, error) {
 	jobs := new(Job)
 
 	err := db.Bun.
 		NewSelect().
 		Model(jobs).
 		Where("related_table = ?", relatedTable).
-		Where("related_id = ?", relatedID).
+		Where("related_id = ?", relatedId).
 		Scan(ctx)
 
 	return jobs, err
 }
-func FindJobsByRelated(ctx context.Context, relatedTable string, relatedID int) ([]*Job, error) {
+func FindJobsByRelated(ctx context.Context, relatedTable string, relatedId int) ([]*Job, error) {
 	jobs := make([]*Job, 0)
 
 	err := db.Bun.
 		NewSelect().
 		Model(&jobs).
 		Where("related_table = ?", relatedTable).
-		Where("related_id = ?", relatedID).
+		Where("related_id = ?", relatedId).
 		Scan(ctx)
 
 	return jobs, err
 }
 
-func FindJobsByRelatedBulk(ctx context.Context, relatedTable string, relatedIDs []int) ([]*Job, error) {
+func FindJobsByRelatedBulk(ctx context.Context, relatedTable string, relatedIds []int) ([]*Job, error) {
 	jobs := make([]*Job, 0)
 
 	err := db.Bun.
 		NewSelect().
 		Model(&jobs).
 		Where("related_table = ?", relatedTable).
-		Where("related_id IN (?)", bun.In(relatedIDs)).
+		Where("related_id IN (?)", bun.In(relatedIds)).
 		Scan(ctx)
 
 	return jobs, err
@@ -261,12 +261,12 @@ func DeleteJobs(ctx context.Context, ids []int) error {
 	return nil
 }
 
-func DeleteJobsByRelated(ctx context.Context, relatedTable string, relatedID int) error {
+func DeleteJobsByRelated(ctx context.Context, relatedTable string, relatedId int) error {
 	_, err := db.Bun.
 		NewDelete().
 		Model(new(Job)).
 		Where("related_table = ?", relatedTable).
-		Where("related_id = ?", relatedID).
+		Where("related_id = ?", relatedId).
 		Exec(ctx)
 	if err != nil {
 		return err
@@ -275,12 +275,12 @@ func DeleteJobsByRelated(ctx context.Context, relatedTable string, relatedID int
 	return nil
 }
 
-func DeleteJobsByRelatedBulk(ctx context.Context, relatedTable string, relatedIDs []int) error {
+func DeleteJobsByRelatedBulk(ctx context.Context, relatedTable string, relatedIds []int) error {
 	_, err := db.Bun.
 		NewDelete().
 		Model(new(Job)).
 		Where("related_table = ?", relatedTable).
-		Where("related_id IN (?)", bun.In(relatedIDs)).
+		Where("related_id IN (?)", bun.In(relatedIds)).
 		Exec(ctx)
 	if err != nil {
 		return err

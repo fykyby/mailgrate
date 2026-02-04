@@ -166,7 +166,7 @@ func UserLogIn(c *echo.Context) error {
 	}
 
 	err = helpers.SetUserSessionData(c, &helpers.UserSessionData{
-		ID:    u.ID,
+		ID:    u.Id,
 		Email: u.Email,
 	})
 	if err != nil {
@@ -289,7 +289,7 @@ func UserShowPasswordReset(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
 	}
 
-	if u.ID != helpers.GetUserSessionData(c).ID {
+	if u.Id != helpers.GetUserSessionData(c).ID {
 		_ = helpers.ClearUserSessionData(c)
 	}
 

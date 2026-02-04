@@ -22,28 +22,30 @@ import (
 func SyncListIndex(c *echo.Context) error {
 	page, err := helpers.QueryParamAsInt(c, "page")
 	if err != nil {
+		slog.Error("Error parsing page parameter", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
 	}
 
 	syncLists, err := models.FindSyncListsByUserIDPaginated(c.Request().Context(), helpers.GetUserSessionData(c).ID, page)
 	if err != nil {
+		slog.Error("Error finding sync lists", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
 	}
 
 	listIDs := make([]int, len(syncLists.SyncLists))
 	for i, list := range syncLists.SyncLists {
-		listIDs[i] = list.ID
+		listIDs[i] = list.Id
 	}
 
 	statuses, err := models.FindSyncListsStatus(c.Request().Context(), listIDs)
 	if err != nil {
-		log.Printf("Error finding sync list statuses: %v", err)
-		return err
+		slog.Error("Error finding sync list statuses", "error", err)
+		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
 	}
 
 	jobStatusMap := make(map[int]models.JobStatus)
 	for _, status := range statuses {
-		jobStatusMap[status.ID] = status.Status
+		jobStatusMap[status.Id] = status.Status
 	}
 
 	return helpers.Render(c, http.StatusOK, synclist.Index(synclist.IndexProps{
@@ -58,11 +60,12 @@ func SyncListNew(c *echo.Context) error {
 
 func SyncListCreate(c *echo.Context) error {
 	var req struct {
-		Name    string `form:"Name" validate:"required,max=255"`
-		SrcHost string `form:"SrcHost" validate:"required,max=255"`
-		SrcPort int    `form:"SrcPort" validate:"required,min=1,max=65535"`
-		DstHost string `form:"DstHost" validate:"required,max=255"`
-		DstPort int    `form:"DstPort" validate:"required,min=1,max=65535"`
+		Name              string `form:"Name" validate:"required,max=255"`
+		SrcHost           string `form:"SrcHost" validate:"required,max=255"`
+		SrcPort           int    `form:"SrcPort" validate:"required,min=1,max=65535"`
+		DstHost           string `form:"DstHost" validate:"required,max=255"`
+		DstPort           int    `form:"DstPort" validate:"required,min=1,max=65535"`
+		CompareMessageIds bool   `form:"CompareMessageIds" validate:"boolean"`
 	}
 
 	err := helpers.BindAndValidate(c, &req)
@@ -73,7 +76,15 @@ func SyncListCreate(c *echo.Context) error {
 		}))
 	}
 
-	list, err := models.CreateSyncList(c.Request().Context(), helpers.GetUserSessionData(c).ID, req.Name, req.SrcHost, req.SrcPort, req.DstHost, req.DstPort)
+	list, err := models.CreateSyncList(c.Request().Context(), models.CreateSyncListParams{
+		UserId:            helpers.GetUserSessionData(c).ID,
+		Name:              req.Name,
+		SrcHost:           req.SrcHost,
+		SrcPort:           req.SrcPort,
+		DstHost:           req.DstHost,
+		DstPort:           req.DstPort,
+		CompareMessageIds: req.CompareMessageIds,
+	})
 	if err != nil {
 		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", synclist.New(synclist.NewProps{
 			Values: helpers.FormatValues(c),
@@ -81,7 +92,7 @@ func SyncListCreate(c *echo.Context) error {
 		}))
 	}
 
-	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
+	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
 }
 
 func SyncListShow(c *echo.Context) error {
@@ -103,18 +114,18 @@ func SyncListShow(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserID != helpers.GetUserSessionData(c).ID {
+	if list.UserId != helpers.GetUserSessionData(c).ID {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	accounts, err := models.FindEmailAccountsBySyncListIDPaginated(c.Request().Context(), list.ID, page)
+	accounts, err := models.FindEmailAccountsBySyncListIDPaginated(c.Request().Context(), list.Id, page)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
 	accountIDs := make([]int, len(accounts.EmailAccounts))
 	for i, account := range accounts.EmailAccounts {
-		accountIDs[i] = account.ID
+		accountIDs[i] = account.Id
 	}
 
 	jobs, err := models.FindJobsByRelatedBulk(c.Request().Context(), "email_accounts", accountIDs)
@@ -124,10 +135,10 @@ func SyncListShow(c *echo.Context) error {
 
 	accountStatusMap := make(map[int]models.JobStatus)
 	for _, job := range jobs {
-		accountStatusMap[job.RelatedID] = job.Status
+		accountStatusMap[job.RelatedId] = job.Status
 	}
 
-	listStatus, err := models.FindSyncListStatus(c.Request().Context(), list.ID)
+	listStatus, err := models.FindSyncListStatus(c.Request().Context(), list.Id)
 	if err != nil {
 		log.Println(err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
@@ -155,7 +166,7 @@ func SyncListEdit(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserID != helpers.GetUserSessionData(c).ID {
+	if list.UserId != helpers.GetUserSessionData(c).ID {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
@@ -167,11 +178,12 @@ func SyncListEdit(c *echo.Context) error {
 
 func SyncListUpdate(c *echo.Context) error {
 	var req struct {
-		Name    string `form:"Name" validate:"required,max=255"`
-		SrcHost string `form:"SrcHost" validate:"required,max=255"`
-		SrcPort int    `form:"SrcPort" validate:"required,min=1,max=65535"`
-		DstHost string `form:"DstHost" validate:"required,max=255"`
-		DstPort int    `form:"DstPort" validate:"required,min=1,max=65535"`
+		Name              string `form:"Name" validate:"required,max=255"`
+		SrcHost           string `form:"SrcHost" validate:"required,max=255"`
+		SrcPort           int    `form:"SrcPort" validate:"required,min=1,max=65535"`
+		DstHost           string `form:"DstHost" validate:"required,max=255"`
+		DstPort           int    `form:"DstPort" validate:"required,min=1,max=65535"`
+		CompareMessageIds bool   `form:"CompareMessageIds" validate:"boolean"`
 	}
 
 	id, err := helpers.ParamAsInt(c, "id")
@@ -196,18 +208,18 @@ func SyncListUpdate(c *echo.Context) error {
 		}))
 	}
 
-	if list.UserID != helpers.GetUserSessionData(c).ID {
+	if list.UserId != helpers.GetUserSessionData(c).ID {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	accounts, err := models.FindEmailAccountsBySyncListID(c.Request().Context(), list.ID)
+	accounts, err := models.FindEmailAccountsBySyncListID(c.Request().Context(), list.Id)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
 	accountIDs := make([]int, len(accounts))
 	for i, account := range accounts {
-		accountIDs[i] = account.ID
+		accountIDs[i] = account.Id
 	}
 
 	relatedJobs, err := models.FindJobsByRelatedBulk(c.Request().Context(), "email_accounts", accountIDs)
@@ -226,13 +238,14 @@ func SyncListUpdate(c *echo.Context) error {
 	list.SrcPort = req.SrcPort
 	list.DstHost = req.DstHost
 	list.DstPort = req.DstPort
+	list.CompareMessageIds = req.CompareMessageIds
 
 	err = models.UpdateSyncList(c.Request().Context(), list)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
+	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
 }
 
 func SyncListDelete(c *echo.Context) error {
@@ -249,18 +262,18 @@ func SyncListDelete(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserID != helpers.GetUserSessionData(c).ID {
+	if list.UserId != helpers.GetUserSessionData(c).ID {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	accounts, err := models.FindEmailAccountsBySyncListID(c.Request().Context(), list.ID)
+	accounts, err := models.FindEmailAccountsBySyncListID(c.Request().Context(), list.Id)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
 	accountIDs := make([]int, len(accounts))
 	for i, account := range accounts {
-		accountIDs[i] = account.ID
+		accountIDs[i] = account.Id
 	}
 
 	relatedJobs, err := models.FindJobsByRelatedBulk(c.Request().Context(), "email_accounts", accountIDs)
@@ -298,12 +311,12 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserID != userID {
+	if list.UserId != userID {
 		slog.Debug("Unauthorized access attempt", "userID", userID, "listID", id)
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	accounts, err := models.FindEmailAccountsBySyncListID(ctx, list.ID)
+	accounts, err := models.FindEmailAccountsBySyncListID(ctx, list.Id)
 	if err != nil {
 		slog.Debug("Failed to find email accounts", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
@@ -316,7 +329,7 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 	// Extract account IDs
 	accountIDs := make([]int, len(accounts))
 	for i, account := range accounts {
-		accountIDs[i] = account.ID
+		accountIDs[i] = account.Id
 	}
 
 	// Fetch existing jobs
@@ -329,11 +342,11 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 	// Validate and organize jobs by account
 	jobsByAccountID := make(map[int]*models.Job)
 	for _, job := range existingJobs {
-		if _, exists := jobsByAccountID[job.RelatedID]; exists {
-			slog.Error("multiple jobs found for email account", "email_account", job.RelatedID)
+		if _, exists := jobsByAccountID[job.RelatedId]; exists {
+			slog.Error("multiple jobs found for email account", "email_account", job.RelatedId)
 			return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 		}
-		jobsByAccountID[job.RelatedID] = job
+		jobsByAccountID[job.RelatedId] = job
 	}
 
 	// Update existing jobs and collect new job payloads
@@ -342,7 +355,7 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 	newJobAccountIDs := make([]int, 0)
 
 	for _, account := range accounts {
-		job, exists := jobsByAccountID[account.ID]
+		job, exists := jobsByAccountID[account.Id]
 		if exists {
 			// Update existing job if not already running/pending
 			if !(job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending) {
@@ -353,8 +366,9 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 					return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 				}
 
-				payload.Source = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
-				payload.Destination = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
+				payload.SrcAddr = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
+				payload.DstAddr = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
+				payload.CompareMessageIds = list.CompareMessageIds
 
 				json, err := json.Marshal(payload)
 				if err != nil {
@@ -367,17 +381,15 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 				jobsToUpdate = append(jobsToUpdate, job)
 			}
 		} else {
-			// Create new job
-			payload := jobs.MigrateAccount{
-				Source:            net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
-				Destination:       net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
+			payload := jobs.NewMigrateAccount(jobs.NewMigrateAccountParams{
+				SrcAddr:           net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
+				DstAddr:           net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
 				SrcUser:           account.SrcUser,
 				SrcPassword:       account.SrcPasswordHash,
 				DstUser:           account.DstUser,
 				DstPassword:       account.DstPasswordHash,
-				FolderLastUid:     make(map[string]uint32),
-				FolderUidValidity: make(map[string]uint32),
-			}
+				CompareMessageIDs: list.CompareMessageIds,
+			})
 
 			data, err := json.Marshal(payload)
 			if err != nil {
@@ -385,7 +397,7 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 				return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 			}
 			newJobPayloads = append(newJobPayloads, data)
-			newJobAccountIDs = append(newJobAccountIDs, account.ID)
+			newJobAccountIDs = append(newJobAccountIDs, account.Id)
 		}
 	}
 
@@ -406,7 +418,7 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 		}
 	}
 
-	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
+	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
 }
 
 func SyncListJobMigrateStop(c *echo.Context) error {
@@ -423,11 +435,11 @@ func SyncListJobMigrateStop(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserID != userID {
+	if list.UserId != userID {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	accounts, err := models.FindEmailAccountsBySyncListID(ctx, list.ID)
+	accounts, err := models.FindEmailAccountsBySyncListID(ctx, list.Id)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
@@ -439,7 +451,7 @@ func SyncListJobMigrateStop(c *echo.Context) error {
 	// Extract account IDs
 	accountIDs := make([]int, len(accounts))
 	for i, account := range accounts {
-		accountIDs[i] = account.ID
+		accountIDs[i] = account.Id
 	}
 
 	// Fetch and cancel all running jobs
@@ -449,11 +461,11 @@ func SyncListJobMigrateStop(c *echo.Context) error {
 	}
 
 	for _, job := range jobs {
-		runningJob := worker.GetRunningJob(job.ID)
+		runningJob := worker.GetRunningJob(job.Id)
 		if runningJob != nil {
 			runningJob.Cancel()
 		}
 	}
 
-	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
+	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
 }

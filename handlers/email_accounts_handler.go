@@ -33,7 +33,7 @@ func EmailAccountNew(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserID != helpers.GetUserSessionData(c).ID {
+	if list.UserId != helpers.GetUserSessionData(c).ID {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
@@ -74,7 +74,7 @@ func EmailAccountCreate(c *echo.Context) error {
 		}))
 	}
 
-	if list.UserID != helpers.GetUserSessionData(c).ID {
+	if list.UserId != helpers.GetUserSessionData(c).ID {
 		return helpers.RenderFragment(c, http.StatusForbidden, "form", emailaccounts.New(emailaccounts.NewProps{
 			List:   list,
 			Values: helpers.FormatValues(c),
@@ -100,7 +100,7 @@ func EmailAccountCreate(c *echo.Context) error {
 		}))
 	}
 
-	_, err = models.CreateEmailAccount(c.Request().Context(), list.ID, req.SrcUser, encryptedSrcPassword, req.DstUser, encryptedDstPassword)
+	_, err = models.CreateEmailAccount(c.Request().Context(), list.Id, req.SrcUser, encryptedSrcPassword, req.DstUser, encryptedDstPassword)
 	if err != nil {
 		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", emailaccounts.New(emailaccounts.NewProps{
 			List:   list,
@@ -109,7 +109,7 @@ func EmailAccountCreate(c *echo.Context) error {
 		}))
 	}
 
-	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
+	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
 }
 
 func EmailAccountDelete(c *echo.Context) error {
@@ -131,7 +131,7 @@ func EmailAccountDelete(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserID != helpers.GetUserSessionData(c).ID {
+	if list.UserId != helpers.GetUserSessionData(c).ID {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
@@ -143,11 +143,11 @@ func EmailAccountDelete(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if account.SyncListID != list.ID {
+	if account.SyncListId != list.Id {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	relatedJobs, err := models.FindJobsByRelated(c.Request().Context(), "email_accounts", account.ID)
+	relatedJobs, err := models.FindJobsByRelated(c.Request().Context(), "email_accounts", account.Id)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
@@ -163,7 +163,7 @@ func EmailAccountDelete(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
+	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
 }
 
 func EmailAccountJobMigrateStart(c *echo.Context) error {
@@ -206,13 +206,13 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 	}
 
 	// Validate ownership
-	if list.UserID != userID || account.SyncListID != list.ID {
-		slog.Debug("Invalid ownership", "listID", list.ID, "userID", userID, "accountID", account.ID)
+	if list.UserId != userID || account.SyncListId != list.Id {
+		slog.Debug("Invalid ownership", "listID", list.Id, "userID", userID, "accountID", account.Id)
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
 	// Get existing job
-	job, err := models.FindJobByRelated(ctx, "email_accounts", account.ID)
+	job, err := models.FindJobByRelated(ctx, "email_accounts", account.Id)
 	if err != nil {
 		if !errorsx.IsNotFoundError(err) {
 			slog.Debug("Failed to find job", "error", err)
@@ -221,9 +221,9 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 	}
 
 	// Handle existing job
-	if job.ID != 0 {
+	if job.Id != 0 {
 		if job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending {
-			slog.Debug("Job already running or pending", "jobID", job.ID)
+			slog.Debug("Job already running or pending", "jobID", job.Id)
 			return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 		}
 
@@ -234,8 +234,8 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 		}
 
-		payload.Source = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
-		payload.Destination = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
+		payload.SrcAddr = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
+		payload.DstAddr = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
 
 		json, err := json.Marshal(payload)
 		if err != nil {
@@ -252,23 +252,22 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 
 		page, err := helpers.QueryParamAsInt(c, "page")
 		if err != nil {
-			return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
+			return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
 		} else {
-			return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID)+"?page="+strconv.Itoa(page))
+			return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id)+"?page="+strconv.Itoa(page))
 		}
 	}
 
 	// Create new job
-	payload := jobs.MigrateAccount{
-		Source:            net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
-		Destination:       net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
+	payload := jobs.NewMigrateAccount(jobs.NewMigrateAccountParams{
+		SrcAddr:           net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
+		DstAddr:           net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
 		SrcUser:           account.SrcUser,
 		SrcPassword:       account.SrcPasswordHash,
 		DstUser:           account.DstUser,
 		DstPassword:       account.DstPasswordHash,
-		FolderLastUid:     make(map[string]uint32),
-		FolderUidValidity: make(map[string]uint32),
-	}
+		CompareMessageIDs: list.CompareMessageIds,
+	})
 
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -284,9 +283,9 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 
 	page, err := helpers.QueryParamAsInt(c, "page")
 	if err != nil {
-		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
+		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
 	} else {
-		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID)+"?page="+strconv.Itoa(page))
+		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id)+"?page="+strconv.Itoa(page))
 	}
 
 }
@@ -328,12 +327,12 @@ func EmailAccountJobMigrateStop(c *echo.Context) error {
 	}
 
 	// Validate ownership
-	if list.ID != userID || account.SyncListID != list.ID {
+	if list.Id != userID || account.SyncListId != list.Id {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
 	// Get existing job
-	job, err := models.FindJobByRelated(ctx, "email_accounts", account.ID)
+	job, err := models.FindJobByRelated(ctx, "email_accounts", account.Id)
 	if err != nil {
 		if errorsx.IsNotFoundError(err) {
 			return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
@@ -347,7 +346,7 @@ func EmailAccountJobMigrateStop(c *echo.Context) error {
 	}
 
 	// Get and cancel running job
-	runningJob := worker.GetRunningJob(job.ID)
+	runningJob := worker.GetRunningJob(job.Id)
 	if runningJob == nil {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
@@ -356,8 +355,8 @@ func EmailAccountJobMigrateStop(c *echo.Context) error {
 
 	page, err := helpers.QueryParamAsInt(c, "page")
 	if err != nil {
-		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
+		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
 	} else {
-		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID)+"?page="+strconv.Itoa(page))
+		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id)+"?page="+strconv.Itoa(page))
 	}
 }

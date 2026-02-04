@@ -11,8 +11,8 @@ import (
 type EmailAccount struct {
 	bun.BaseModel `bun:"table:email_accounts"`
 
-	ID              int `bun:",pk,autoincrement"`
-	SyncListID      int
+	Id              int `bun:",pk,autoincrement"`
+	SyncListId      int
 	SrcUser         string
 	SrcPasswordHash string
 	DstUser         string
@@ -24,9 +24,9 @@ type EmailAccountsPaginated struct {
 	Pagination    helpers.Pagination
 }
 
-func CreateEmailAccount(ctx context.Context, syncListID int, srcUser string, srcPasswordHash string, dstUser string, dstPasswordHash string) (*EmailAccount, error) {
+func CreateEmailAccount(ctx context.Context, syncListId int, srcUser string, srcPasswordHash string, dstUser string, dstPasswordHash string) (*EmailAccount, error) {
 	emailAccount := &EmailAccount{
-		SyncListID:      syncListID,
+		SyncListId:      syncListId,
 		SrcUser:         srcUser,
 		SrcPasswordHash: srcPasswordHash,
 		DstUser:         dstUser,
@@ -59,13 +59,13 @@ func FindEmailAccountByID(ctx context.Context, id int) (*EmailAccount, error) {
 	return emailAccount, nil
 }
 
-func FindEmailAccountsBySyncListIDPaginated(ctx context.Context, syncListID int, page int) (*EmailAccountsPaginated, error) {
+func FindEmailAccountsBySyncListIDPaginated(ctx context.Context, syncListId int, page int) (*EmailAccountsPaginated, error) {
 	var emailAccounts []*EmailAccount
 
 	err := db.Bun.
 		NewSelect().
 		Model(&emailAccounts).
-		Where("sync_list_id = ?", syncListID).
+		Where("sync_list_id = ?", syncListId).
 		Limit(helpers.PaginationLimit).
 		Offset((page-1)*helpers.PaginationLimit).
 		OrderBy("src_user", bun.OrderAsc).
@@ -78,7 +78,7 @@ func FindEmailAccountsBySyncListIDPaginated(ctx context.Context, syncListID int,
 	total, err := db.Bun.
 		NewSelect().
 		Model(&EmailAccount{}).
-		Where("sync_list_id = ?", syncListID).
+		Where("sync_list_id = ?", syncListId).
 		Count(ctx)
 	if err != nil {
 		return nil, err
@@ -92,13 +92,13 @@ func FindEmailAccountsBySyncListIDPaginated(ctx context.Context, syncListID int,
 	return emailAccountsPaginated, nil
 }
 
-func FindEmailAccountsBySyncListID(ctx context.Context, syncListID int) ([]*EmailAccount, error) {
+func FindEmailAccountsBySyncListID(ctx context.Context, syncListId int) ([]*EmailAccount, error) {
 	var emailAccounts []*EmailAccount
 
 	err := db.Bun.
 		NewSelect().
 		Model(&emailAccounts).
-		Where("sync_list_id = ?", syncListID).
+		Where("sync_list_id = ?", syncListId).
 		Limit(helpers.PaginationLimit).
 		OrderBy("src_user", bun.OrderAsc).
 		OrderBy("dst_user", bun.OrderAsc).
@@ -111,7 +111,7 @@ func FindEmailAccountsBySyncListID(ctx context.Context, syncListID int) ([]*Emai
 }
 
 func DeleteEmailAccount(ctx context.Context, id int) error {
-	emailAccount := &EmailAccount{ID: id}
+	emailAccount := &EmailAccount{Id: id}
 
 	_, err := db.Bun.
 		NewDelete().

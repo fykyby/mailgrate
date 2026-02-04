@@ -11,7 +11,7 @@ import (
 type User struct {
 	bun.BaseModel `bun:"table:users"`
 
-	ID                     int `bun:",pk,autoincrement"`
+	Id                     int `bun:",pk,autoincrement"`
 	Email                  string
 	PasswordHash           string
 	Confirmed              bool

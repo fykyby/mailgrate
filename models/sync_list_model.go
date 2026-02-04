@@ -11,13 +11,14 @@ import (
 type SyncList struct {
 	bun.BaseModel `bun:"table:sync_lists"`
 
-	ID      int `bun:",pk,autoincrement"`
-	UserID  int
-	Name    string
-	SrcHost string
-	SrcPort int
-	DstHost string
-	DstPort int
+	Id                int `bun:",pk,autoincrement"`
+	UserId            int
+	Name              string
+	SrcHost           string
+	SrcPort           int
+	DstHost           string
+	DstPort           int
+	CompareMessageIds bool
 }
 
 type SyncListsPaginated struct {
@@ -26,18 +27,29 @@ type SyncListsPaginated struct {
 }
 
 type SyncListStatus struct {
-	ID     int
+	Id     int
 	Status JobStatus
 }
 
-func CreateSyncList(ctx context.Context, userID int, name string, sourceHost string, sourcePort int, destinationHost string, destinationPort int) (*SyncList, error) {
+type CreateSyncListParams struct {
+	UserId            int
+	Name              string
+	SrcHost           string
+	SrcPort           int
+	DstHost           string
+	DstPort           int
+	CompareMessageIds bool
+}
+
+func CreateSyncList(ctx context.Context, params CreateSyncListParams) (*SyncList, error) {
 	syncList := &SyncList{
-		UserID:  userID,
-		Name:    name,
-		SrcHost: sourceHost,
-		SrcPort: sourcePort,
-		DstHost: destinationHost,
-		DstPort: destinationPort,
+		UserId:            params.UserId,
+		Name:              params.Name,
+		SrcHost:           params.SrcHost,
+		SrcPort:           params.SrcPort,
+		DstHost:           params.DstHost,
+		DstPort:           params.DstPort,
+		CompareMessageIds: params.CompareMessageIds,
 	}
 
 	_, err := db.Bun.
@@ -66,13 +78,13 @@ func FindSyncListByID(ctx context.Context, id int) (*SyncList, error) {
 	return &syncList, nil
 }
 
-func FindSyncListsByUserIDPaginated(ctx context.Context, userID int, page int) (*SyncListsPaginated, error) {
+func FindSyncListsByUserIDPaginated(ctx context.Context, userId int, page int) (*SyncListsPaginated, error) {
 	var syncLists []*SyncList
 
 	err := db.Bun.
 		NewSelect().
 		Model(&syncLists).
-		Where("user_id = ?", userID).
+		Where("user_id = ?", userId).
 		Limit(helpers.PaginationLimit).
 		Offset((page-1)*helpers.PaginationLimit).
 		OrderBy("name", bun.OrderAsc).
@@ -84,7 +96,7 @@ func FindSyncListsByUserIDPaginated(ctx context.Context, userID int, page int) (
 	total, err := db.Bun.
 		NewSelect().
 		Model(&SyncList{}).
-		Where("user_id = ?", userID).
+		Where("user_id = ?", userId).
 		Count(ctx)
 	if err != nil {
 		return nil, err
@@ -116,7 +128,7 @@ func DeleteSyncListByID(ctx context.Context, id int) error {
 	if err == nil {
 		accountIDs := make([]int, len(accounts))
 		for i, account := range accounts {
-			accountIDs[i] = account.ID
+			accountIDs[i] = account.Id
 		}
 		_ = DeleteJobsByRelatedBulk(ctx, "email_accounts", accountIDs)
 	}

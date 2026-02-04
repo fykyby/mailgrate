@@ -7,6 +7,8 @@ import (
 	"app/templates/components/button"
 	"app/templates/components/form"
 	"app/templates/components/input"
+	"app/templates/components/label"
+	switchcomp "app/templates/components/switch"
 	"app/templates/layouts"
 	"strconv"
 )
@@ -23,10 +25,10 @@ templ Edit(props EditProps) {
 	}) {
 		@components.TitleBar(components.TitleBarProps{
 			Title:       "Edit Sync List - " + props.List.Name,
-			PreviousURL: "/app/sync-lists/" + strconv.Itoa(props.List.ID),
+			PreviousURL: "/app/sync-lists/" + strconv.Itoa(props.List.Id),
 		})
 		@templ.Fragment("form") {
-			<form id="form" hx-put={ "/app/sync-lists/" + strconv.Itoa(props.List.ID) } hx-swap="outerHTML">
+			<form id="form" hx-put={ "/app/sync-lists/" + strconv.Itoa(props.List.Id) } hx-swap="outerHTML">
 				@form.Item() {
 					@form.Label(form.LabelProps{
 						For: "Name",
@@ -126,6 +128,28 @@ templ Edit(props EditProps) {
 							Variant: form.MessageVariantError,
 						}) {
 							{ props.Errors["DstPort"] }
+						}
+					}
+				}
+				@form.Item() {
+					<div class="flex items-center gap-2">
+						@switchcomp.Switch(switchcomp.Props{
+							ID:      "CompareMessageIds",
+							Name:    "CompareMessageIds",
+							Value:   "true",
+							Checked: props.Values["CompareMessageIds"] == "true",
+						})
+						@label.Label(label.Props{
+							For: "CompareMessageIds",
+						}) {
+							Compare Message IDs
+						}
+					</div>
+					if props.Errors["CompareMessageIds"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["CompareMessageIds"] }
 						}
 					}
 				}

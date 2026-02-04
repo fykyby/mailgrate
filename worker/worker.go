@@ -70,14 +70,14 @@ func StartWorker(ctx context.Context, notifyChan <-chan pgdriver.Notification) {
 }
 
 func runJob(ctx context.Context, job *models.Job) {
-	slog.Info("worker: job started", "job", job.ID)
+	slog.Info("worker: job started", "job", job.Id)
 
 	jobCtx, cancelJob := context.WithTimeout(ctx, time.Duration(config.Config.JobTimeoutMinutes)*time.Minute)
 	defer cancelJob()
 
 	factory, ok := jobRegistry[job.Type]
 	if !ok {
-		slog.Error("worker: job type not found", "job", job.ID)
+		slog.Error("worker: job type not found", "job", job.Id)
 
 		job.Status = models.JobStatusFailed
 		job.Error = "unknown job type"
@@ -88,14 +88,14 @@ func runJob(ctx context.Context, job *models.Job) {
 	handler := factory()
 
 	runningJobsMu.Lock()
-	runningJobs[job.ID] = &runningJob{
+	runningJobs[job.Id] = &runningJob{
 		Handler: handler,
 		Cancel:  cancelJob,
 	}
 	runningJobsMu.Unlock()
 	defer func() {
 		runningJobsMu.Lock()
-		delete(runningJobs, job.ID)
+		delete(runningJobs, job.Id)
 		runningJobsMu.Unlock()
 	}()
 
@@ -104,7 +104,7 @@ func runJob(ctx context.Context, job *models.Job) {
 		if r != nil {
 			stack := debug.Stack()
 
-			slog.Error("worker: job panicked", "job", job.ID, "panic", r, "stack", string(stack))
+			slog.Error("worker: job panicked", "job", job.Id, "panic", r, "stack", string(stack))
 
 			job.Status = models.JobStatusFailed
 			job.Error = fmt.Sprintf("%v", r)
@@ -116,7 +116,7 @@ func runJob(ctx context.Context, job *models.Job) {
 	// Payload is mutable and represents job progress
 	err := json.Unmarshal(job.Payload, handler)
 	if err != nil {
-		slog.Error("worker: failed to unmarshal job payload", "job", job.ID, "error", err.Error())
+		slog.Error("worker: failed to unmarshal job payload", "job", job.Id, "error", err.Error())
 		job.Status = models.JobStatusFailed
 		job.Error = err.Error()
 		job.FinishedAt = time.Now()
@@ -141,21 +141,21 @@ func runJob(ctx context.Context, job *models.Job) {
 
 	switch {
 	case errors.Is(err, context.Canceled):
-		slog.Info("worker: job interrupted", "job", job.ID, "error", err.Error())
+		slog.Info("worker: job interrupted", "job", job.Id, "error", err.Error())
 		job.Status = models.JobStatusInterrupted
 	case err != nil:
-		slog.Error("worker: job failed", "job", job.ID, "error", err.Error())
+		slog.Error("worker: job failed", "job", job.Id, "error", err.Error())
 		job.Status = models.JobStatusFailed
 		job.Error = err.Error()
 	default:
-		slog.Info("worker: job completed", "job", job.ID)
+		slog.Info("worker: job completed", "job", job.Id)
 		job.Status = models.JobStatusCompleted
 	}
 
 	job.FinishedAt = time.Now()
 	err = updateJob(ctx, job, handler)
 	if err != nil {
-		slog.Error("worker: failed to update job", "job", job.ID, "error", err.Error())
+		slog.Error("worker: failed to update job", "job", job.Id, "error", err.Error())
 		return
 	}
 }
@@ -164,7 +164,7 @@ func updateJob(ctx context.Context, job *models.Job, handler JobHandler) error {
 	if handler != nil {
 		payload, err := json.Marshal(handler)
 		if err != nil {
-			slog.Error("worker: failed to marshal job handler", "job", job.ID, "error", err.Error())
+			slog.Error("worker: failed to marshal job handler", "job", job.Id, "error", err.Error())
 			job.Payload = []byte(`{"error":"failed to marshal handler state"}`)
 		} else {
 			job.Payload = payload
@@ -173,7 +173,7 @@ func updateJob(ctx context.Context, job *models.Job, handler JobHandler) error {
 
 	err := models.UpdateJob(ctx, job)
 	if err != nil {
-		slog.Error("worker: failed to update job", "job", job.ID, "error", err.Error())
+		slog.Error("worker: failed to update job", "job", job.Id, "error", err.Error())
 		return err
 	}
 

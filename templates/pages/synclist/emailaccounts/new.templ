@@ -23,10 +23,10 @@ templ New(props NewProps) {
 	}) {
 		@components.TitleBar(components.TitleBarProps{
 			Title:       "Add Email Account - " + props.List.Name,
-			PreviousURL: "/app/sync-lists/" + strconv.Itoa(props.List.ID),
+			PreviousURL: "/app/sync-lists/" + strconv.Itoa(props.List.Id),
 		})
 		@templ.Fragment("form") {
-			<form id="form" hx-post={ "/app/sync-lists/" + strconv.Itoa(props.List.ID) + "/email-accounts" } hx-swap="outerHTML">
+			<form id="form" hx-post={ "/app/sync-lists/" + strconv.Itoa(props.List.Id) + "/email-accounts" } hx-swap="outerHTML">
 				@form.Item() {
 					@form.Label(form.LabelProps{
 						For: "SrcUser",

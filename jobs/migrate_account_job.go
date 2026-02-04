@@ -17,38 +17,50 @@ import (
 var MigrateAccountType models.JobType = "migrate_account"
 
 type MigrateAccount struct {
-	Source            string
-	Destination       string
+	SrcAddr           string
+	DstAddr           string
 	SrcUser           string
 	SrcPassword       string
 	DstUser           string
 	DstPassword       string
+	CompareMessageIds bool
 	FolderLastUid     map[string]uint32
 	FolderUidValidity map[string]uint32
 }
 
-func NewMigrateAccount(syncListID int, emailAccountID int, src string, dst string, srcUser string, srcPassword string, dstUser string, dstPassword string) *MigrateAccount {
+type NewMigrateAccountParams struct {
+	SrcAddr           string
+	DstAddr           string
+	SrcUser           string
+	SrcPassword       string
+	DstUser           string
+	DstPassword       string
+	CompareMessageIDs bool
+}
+
+func NewMigrateAccount(params NewMigrateAccountParams) *MigrateAccount {
 	return &MigrateAccount{
-		Source:            src,
-		Destination:       dst,
-		SrcUser:           srcUser,
-		SrcPassword:       srcPassword,
-		DstUser:           dstUser,
-		DstPassword:       dstPassword,
+		SrcAddr:           params.SrcAddr,
+		DstAddr:           params.DstAddr,
+		SrcUser:           params.SrcUser,
+		SrcPassword:       params.SrcPassword,
+		DstUser:           params.DstUser,
+		DstPassword:       params.DstPassword,
+		CompareMessageIds: params.CompareMessageIDs,
 		FolderLastUid:     make(map[string]uint32),
 		FolderUidValidity: make(map[string]uint32),
 	}
 }
 
 func (j *MigrateAccount) Run(ctx context.Context) (err error) {
-	sourceClient, err := client.Dial(j.Source)
+	srcClient, err := client.Dial(j.SrcAddr)
 	if err != nil {
 		slog.Debug("Failed to connect to source server", "error", err)
 		return err
 	}
-	defer sourceClient.Logout()
+	defer srcClient.Logout()
 
-	err = sourceClient.StartTLS(&tls.Config{
+	err = srcClient.StartTLS(&tls.Config{
 		InsecureSkipVerify: config.Config.IsDev,
 	})
 	if err != nil {
@@ -56,14 +68,14 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 		return err
 	}
 
-	destClient, err := client.Dial(j.Destination)
+	dstClient, err := client.Dial(j.DstAddr)
 	if err != nil {
 		slog.Debug("Failed to connect to destination server", "error", err)
 		return err
 	}
-	defer destClient.Logout()
+	defer dstClient.Logout()
 
-	err = destClient.StartTLS(&tls.Config{
+	err = dstClient.StartTLS(&tls.Config{
 		InsecureSkipVerify: config.Config.IsDev,
 	})
 	if err != nil {
@@ -83,12 +95,12 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 		return err
 	}
 
-	if err := sourceClient.Login(j.SrcUser, decryptedSrcPassword); err != nil {
+	if err := srcClient.Login(j.SrcUser, decryptedSrcPassword); err != nil {
 		slog.Debug("Failed to login to source account", "error", err)
 		return err
 	}
 
-	if err := destClient.Login(j.DstUser, decryptedDstPassword); err != nil {
+	if err := dstClient.Login(j.DstUser, decryptedDstPassword); err != nil {
 		slog.Debug("Failed to login to destination account", "error", err)
 		return err
 	}
@@ -96,7 +108,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 	foldersChan := make(chan *imap.MailboxInfo)
 	listFoldersDone := make(chan error, 1)
 	go func() {
-		listFoldersDone <- sourceClient.List("", "*", foldersChan)
+		listFoldersDone <- srcClient.List("", "*", foldersChan)
 	}()
 
 	folderNames := []string{}
@@ -117,7 +129,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 		default:
 		}
 
-		srcFolder, err := sourceClient.Select(folderName, true)
+		srcFolder, err := srcClient.Select(folderName, true)
 		if err != nil {
 			slog.Debug("Failed to select source folder", "folder", folderName, "error", err)
 			return err
@@ -131,7 +143,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 		criteria := imap.NewSearchCriteria()
 		criteria.Uid = &imap.SeqSet{}
 		criteria.Uid.AddRange(j.FolderLastUid[folderName]+1, 4294967295)
-		uids, err := sourceClient.Search(criteria)
+		uids, err := srcClient.Search(criteria)
 		if err != nil {
 			slog.Debug("Failed to search for messages", "folder", folderName, "error", err)
 			return err
@@ -141,7 +153,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			continue
 		}
 
-		if err := destClient.Create(folderName); err != nil {
+		if err := dstClient.Create(folderName); err != nil {
 			if !strings.Contains(strings.ToUpper(err.Error()), "ALREADYEXISTS") && !strings.Contains(strings.ToUpper(err.Error()), "ALREADY EXISTS") {
 				slog.Debug("Failed to create destination folder", "folder", folderName, "error", err)
 				return err
@@ -154,7 +166,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 		messages := make(chan *imap.Message)
 		fetchMessagesDone := make(chan error, 1)
 		go func() {
-			fetchMessagesDone <- sourceClient.Fetch(seqset, []imap.FetchItem{
+			fetchMessagesDone <- srcClient.Fetch(seqset, []imap.FetchItem{
 				imap.FetchEnvelope,
 				imap.FetchFlags,
 				imap.FetchRFC822,
@@ -169,7 +181,31 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			default:
 			}
 
-			slog.Debug("Fetched message", "uid", msg.Uid)
+			slog.Debug("Fetched message", "uid", msg.Uid, "message-id", msg.Envelope.MessageId)
+
+			if j.CompareMessageIds {
+				dstCriteria := imap.NewSearchCriteria()
+				dstCriteria.Header.Set("Message-ID", msg.Envelope.MessageId)
+
+				_, err := dstClient.Select(folderName, true)
+				if err != nil {
+					slog.Debug("Failed to select source folder", "folder", folderName, "error", err)
+					continue
+				}
+
+				existing, err := dstClient.Search(criteria)
+				if err != nil {
+					slog.Debug("Failed to search for message", "error", err)
+					continue
+				}
+
+				if len(existing) > 0 {
+					slog.Debug("Message already exists in destination", "messageID", msg.Envelope.MessageId)
+					continue
+				} else {
+					slog.Debug("Message does not exist in destination", "messageID", msg.Envelope.MessageId)
+				}
+			}
 
 			if msg.Uid <= j.FolderLastUid[folderName] {
 				continue
@@ -187,7 +223,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			appendDone := make(chan error, 1)
 			go func(lit imap.Literal, f []string, d time.Time, u uint32) {
 				select {
-				case appendDone <- destClient.Append(folderName, f, d, lit):
+				case appendDone <- dstClient.Append(folderName, f, d, lit):
 				case <-ctx.Done():
 				}
 			}(literal, flags, date, uid)

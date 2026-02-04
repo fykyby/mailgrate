@@ -6,6 +6,8 @@ import (
 	"app/templates/components/button"
 	"app/templates/components/form"
 	"app/templates/components/input"
+	"app/templates/components/label"
+	switchcomp "app/templates/components/switch"
 	"app/templates/layouts"
 )
 
@@ -123,6 +125,28 @@ templ New(props NewProps) {
 							Variant: form.MessageVariantError,
 						}) {
 							{ props.Errors["DstPort"] }
+						}
+					}
+				}
+				@form.Item() {
+					<div class="flex items-center gap-2">
+						@switchcomp.Switch(switchcomp.Props{
+							ID:      "CompareMessageIds",
+							Name:    "CompareMessageIds",
+							Value:   "true",
+							Checked: props.Values["CompareMessageIds"] == "true",
+						})
+						@label.Label(label.Props{
+							For: "CompareMessageIds",
+						}) {
+							Compare Message IDs
+						}
+					</div>
+					if props.Errors["CompareMessageIds"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["CompareMessageIds"] }
 						}
 					}
 				}

@@ -63,18 +63,18 @@ templ Index(props IndexProps) {
 			@table.Body() {
 				for _, list := range props.PaginatedSyncLists.SyncLists {
 					{{
-						status, ok := props.SyncListStatusMap[list.ID]
+						status, ok := props.SyncListStatusMap[list.Id]
 						if !ok {
 							status = models.JobStatusNone
 						}
 					}}
 					@table.Row() {
 						@table.Cell() {
-							{ list.ID }
+							{ list.Id }
 						}
 						@table.Cell() {
 							@button.Button(button.Props{
-								Href:    "/app/sync-lists/" + strconv.Itoa(list.ID),
+								Href:    "/app/sync-lists/" + strconv.Itoa(list.Id),
 								Variant: button.VariantLink,
 								Class:   "p-0 m-0",
 							}) {
@@ -98,7 +98,7 @@ templ Index(props IndexProps) {
 							Class: "text-right",
 						}) {
 							@dialog.Dialog(dialog.Props{
-								ID: "delete-sync-list-" + strconv.Itoa(list.ID),
+								ID: "delete-sync-list-" + strconv.Itoa(list.Id),
 							}) {
 								@dialog.Trigger() {
 									@button.Button(button.Props{
@@ -119,7 +119,7 @@ templ Index(props IndexProps) {
 											This action will permanently delete "{ list.Name }".
 										}
 									}
-									<div id={ "delete-sync-list-" + strconv.Itoa(list.ID) + "-error" }></div>
+									<div id={ "delete-sync-list-" + strconv.Itoa(list.Id) + "-error" }></div>
 									@dialog.Footer() {
 										@dialog.Close() {
 											@button.Button(button.Props{
@@ -131,8 +131,8 @@ templ Index(props IndexProps) {
 										@button.Button(button.Props{
 											Variant: button.VariantDestructive,
 											Attributes: templ.Attributes{
-												"hx-delete": "/app/sync-lists/" + strconv.Itoa(list.ID),
-												"hx-target": "#delete-sync-list-" + strconv.Itoa(list.ID) + "-error",
+												"hx-delete": "/app/sync-lists/" + strconv.Itoa(list.Id),
+												"hx-target": "#delete-sync-list-" + strconv.Itoa(list.Id) + "-error",
 												"hx-swap":   "outerHTML",
 											},
 										}) {
