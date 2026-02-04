@@ -11,6 +11,11 @@ func WithAuthRequired(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		userSession := helpers.GetUserSessionData(c)
 		if userSession == nil {
+			co, err := c.Cookie("session")
+			if err == nil {
+				co.MaxAge = -1
+				c.SetCookie(co)
+			}
 			helpers.Redirect(c, "/log-in")
 			return nil
 		}

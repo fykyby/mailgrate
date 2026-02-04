@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
+	"strings"
 
 	"github.com/a-h/templ"
 	"github.com/go-playground/validator/v10"
@@ -91,4 +93,46 @@ func FormatErrors(err error) map[string]string {
 	}
 
 	return errs
+}
+
+func StructToValues(input any) map[string]string {
+	result := make(map[string]string)
+
+	v := reflect.ValueOf(input)
+	if v.Kind() == reflect.Pointer {
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return result
+	}
+
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		fieldType := t.Field(i)
+
+		// skip unexported fields
+		if fieldType.PkgPath != "" {
+			continue
+		}
+
+		key := fieldType.Name
+
+		// use json tag if present
+		if tag := fieldType.Tag.Get("json"); tag != "" {
+			tagName := strings.Split(tag, ",")[0]
+			if tagName == "-" {
+				continue
+			}
+			if tagName != "" {
+				key = tagName
+			}
+		}
+
+		value := v.Field(i).Interface()
+		result[key] = fmt.Sprint(value)
+	}
+
+	return result
 }

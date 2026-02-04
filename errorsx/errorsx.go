@@ -24,5 +24,5 @@ func IsNotFoundError(err error) bool {
 		return false
 	}
 
-	return errors.Is(err, sql.ErrNoRows) || strings.Contains(strings.ToLower(err.Error()), "not found")
+	return errors.Is(err, sql.ErrNoRows) || strings.Contains(strings.ToLower(err.Error()), "not found") || strings.Contains(strings.ToLower(err.Error()), "method not allowed")
 }
