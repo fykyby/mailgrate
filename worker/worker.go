@@ -113,6 +113,7 @@ func runJob(ctx context.Context, job *models.Job) {
 		}
 	}()
 
+	// Payload is mutable and represents job progress
 	err := json.Unmarshal(job.Payload, handler)
 	if err != nil {
 		slog.Error("worker: failed to unmarshal job payload", "job", job.Id, "error", err.Error())
