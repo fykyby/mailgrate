@@ -105,6 +105,8 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 				slog.Debug("Failed to start source TLS", "error", err)
 				return err
 			}
+
+			slog.Debug("Connected to source server")
 		}
 
 		if dstClientErr != nil {
@@ -122,6 +124,8 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 				slog.Debug("Failed to start destination TLS", "error", err)
 				return err
 			}
+
+			slog.Debug("Connected to destination server")
 		}
 
 		if srcClient != nil {
@@ -131,8 +135,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			defer dstClient.Logout()
 		}
 
-		slog.Debug("Connected to source and destination servers")
-	case <-time.After(10 * time.Second):
+	case <-time.After(15 * time.Second):
 		return errors.New("dial timeout")
 	}
 
@@ -237,6 +240,11 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			default:
 			}
 
+			if j.CompareLastUid && msg.Uid <= j.FolderLastUid[folderName] {
+				slog.Debug("Message Uid is less than or equal to last UID", "messageID", msg.Envelope.MessageId)
+				continue
+			}
+
 			if j.CompareMessageIds {
 				dstCriteria := imap.NewSearchCriteria()
 				dstCriteria.Header.Set("Message-ID", msg.Envelope.MessageId)
@@ -258,11 +266,6 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 					slog.Debug("Message-ID already exists in destination", "messageID", msg.Envelope.MessageId)
 					continue
 				}
-			}
-
-			if j.CompareLastUid && msg.Uid <= j.FolderLastUid[folderName] {
-				slog.Debug("Message Uid is less than or equal to last UID", "messageID", msg.Envelope.MessageId)
-				continue
 			}
 
 			slog.Debug("Migrating message", "messageID", msg.Envelope.MessageId)
