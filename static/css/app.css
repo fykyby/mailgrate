@@ -117,16 +117,27 @@
         background: var(--color-foreground);
     }
 
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
+
     html {
         font-size: 20px;
+        @apply min-h-screen;
     }
 
     body {
-        @apply bg-background text-foreground;
+        @apply bg-background text-foreground min-h-screen flex flex-col;
     }
 
     form {
-        @apply flex flex-col gap-6;
+        @apply flex flex-col gap-4;
     }
 
     h1 {

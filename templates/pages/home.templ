@@ -1,11 +1,26 @@
 package pages
 
-import "app/templates/layouts"
+import (
+	"app/templates/components/button"
+	"app/templates/layouts"
+)
 
 templ Home() {
 	@layouts.Base(layouts.BaseProps{
 		Title: "Home",
 	}) {
-		<h1>Home</h1>
+		<h1 class="font-bold text-4xl text-center mt-16 sm:mt-32">
+			Mailgrate
+		</h1>
+		<p class="leading-relaxed text-lg text-muted-foreground text-center">
+			Migrate emails between mailboxes with full preservation of messages, attachments, and folder structure.
+		</p>
+		<div class="flex justify-center">
+			@button.Button(button.Props{
+				Href: "/sign-up",
+			}) {
+				Get Started
+			}
+		</div>
 	}
 }
