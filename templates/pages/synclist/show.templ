@@ -24,6 +24,10 @@ type ShowProps struct {
 templ Show(props ShowProps) {
 	@layouts.App(layouts.AppProps{
 		Title: "Sync List - " + props.SyncList.Name,
+		Attributes: templ.Attributes{
+			"hx-get":     "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "?polling=true",
+			"hx-trigger": "every 5s",
+		},
 	}) {
 		@components.TitleBar(components.TitleBarProps{
 			Title:       "Sync List - " + props.SyncList.Name,
@@ -33,6 +37,7 @@ templ Show(props ShowProps) {
 			if len(props.PaginatedEmailAccounts.EmailAccounts) > 0 {
 				if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
 					@button.Button(button.Props{
+						ID: "toggle-sync-list-migration-button",
 						Attributes: templ.Attributes{
 							"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/migrate/start",
 							"hx-swap": "none",
@@ -42,6 +47,7 @@ templ Show(props ShowProps) {
 					}
 				} else if props.SyncListStatus == models.JobStatusRunning || props.SyncListStatus == models.JobStatusPending {
 					@button.Button(button.Props{
+						ID:      "toggle-sync-list-migration-button",
 						Variant: button.VariantDestructive,
 						Attributes: templ.Attributes{
 							"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/migrate/stop",
@@ -52,14 +58,18 @@ templ Show(props ShowProps) {
 					}
 				}
 				@button.Button(button.Props{
-					Variant: button.VariantOutline,
-					Href:    "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/new",
+					ID:         "add-email-account-button",
+					Variant:    button.VariantOutline,
+					Href:       "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/new",
+					Attributes: templ.Attributes{},
 				}) {
 					Add Email Account
 				}
 			} else {
 				@button.Button(button.Props{
-					Href: "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/new",
+					ID:         "add-email-account-button",
+					Href:       "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/new",
+					Attributes: templ.Attributes{},
 				}) {
 					Add Email Account
 				}
@@ -126,6 +136,7 @@ templ Show(props ShowProps) {
 		}
 		<div>
 			@badge.Badge(badge.Props{
+				ID:      "sync-list-status-badge",
 				Variant: badge.VariantOutline,
 			}) {
 				Status: { cases.Title(language.Und).String(string(props.SyncListStatus)) }
@@ -175,6 +186,7 @@ templ Show(props ShowProps) {
 						}
 						@table.Cell() {
 							@badge.Badge(badge.Props{
+								ID:      "email-account-" + strconv.Itoa(account.Id) + "-status-badge",
 								Variant: badge.VariantOutline,
 							}) {
 								{ cases.Title(language.Und).String(string(status)) }
@@ -185,6 +197,7 @@ templ Show(props ShowProps) {
 						}) {
 							if status != models.JobStatusRunning && status != models.JobStatusPending {
 								@button.Button(button.Props{
+									ID:   "toggle-email-account-" + strconv.Itoa(account.Id) + "-migration-button",
 									Size: button.SizeIcon,
 									Attributes: templ.Attributes{
 										"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/" + strconv.Itoa(account.Id) + "/migrate/start",
@@ -195,6 +208,7 @@ templ Show(props ShowProps) {
 								}
 							} else if status == models.JobStatusRunning || status == models.JobStatusPending {
 								@button.Button(button.Props{
+									ID:      "toggle-email-account-" + strconv.Itoa(account.Id) + "-migration-button",
 									Variant: button.VariantDestructive,
 									Size:    button.SizeIcon,
 									Attributes: templ.Attributes{

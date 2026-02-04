@@ -146,6 +146,16 @@ func SyncListShow(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
+	if c.QueryParam("polling") == "true" {
+		helpers.Reswap(c, "none")
+		return helpers.Render(c, http.StatusOK, synclist.PartShowOOB(synclist.ShowProps{
+			SyncList:               list,
+			SyncListStatus:         listStatus.Status,
+			EmailAccountStatusMap:  accountStatusMap,
+			PaginatedEmailAccounts: accounts,
+		}))
+	}
+
 	return helpers.Render(c, http.StatusOK, synclist.Show(synclist.ShowProps{
 		SyncList:               list,
 		SyncListStatus:         listStatus.Status,
