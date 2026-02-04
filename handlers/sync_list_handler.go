@@ -60,13 +60,14 @@ func SyncListNew(c *echo.Context) error {
 
 func SyncListCreate(c *echo.Context) error {
 	var req struct {
-		Name              string `form:"Name" validate:"required,max=255"`
-		SrcHost           string `form:"SrcHost" validate:"required,max=255"`
-		SrcPort           int    `form:"SrcPort" validate:"required,min=1,max=65535"`
-		DstHost           string `form:"DstHost" validate:"required,max=255"`
-		DstPort           int    `form:"DstPort" validate:"required,min=1,max=65535"`
-		CompareMessageIds bool   `form:"CompareMessageIds" validate:"boolean"`
-		CompareLastUid    bool   `form:"CompareLastUid" validate:"boolean"`
+		Name                  string `form:"Name" validate:"required,max=255"`
+		SrcHost               string `form:"SrcHost" validate:"required,max=255"`
+		SrcPort               int    `form:"SrcPort" validate:"required,min=1,max=65535"`
+		DstHost               string `form:"DstHost" validate:"required,max=255"`
+		DstPort               int    `form:"DstPort" validate:"required,min=1,max=65535"`
+		EnableTlsVerification bool   `form:"EnableTlsVerification" validate:"boolean"`
+		CompareMessageIds     bool   `form:"CompareMessageIds" validate:"boolean"`
+		CompareLastUid        bool   `form:"CompareLastUid" validate:"boolean"`
 	}
 
 	err := helpers.BindAndValidate(c, &req)
@@ -78,14 +79,15 @@ func SyncListCreate(c *echo.Context) error {
 	}
 
 	list, err := models.CreateSyncList(c.Request().Context(), models.CreateSyncListParams{
-		UserId:            helpers.GetUserSessionData(c).ID,
-		Name:              req.Name,
-		SrcHost:           req.SrcHost,
-		SrcPort:           req.SrcPort,
-		DstHost:           req.DstHost,
-		DstPort:           req.DstPort,
-		CompareMessageIds: req.CompareMessageIds,
-		CompareLastUid:    req.CompareLastUid,
+		UserId:                helpers.GetUserSessionData(c).ID,
+		Name:                  req.Name,
+		SrcHost:               req.SrcHost,
+		SrcPort:               req.SrcPort,
+		DstHost:               req.DstHost,
+		DstPort:               req.DstPort,
+		EnableTlsVerification: req.EnableTlsVerification,
+		CompareMessageIds:     req.CompareMessageIds,
+		CompareLastUid:        req.CompareLastUid,
 	})
 	if err != nil {
 		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", synclist.New(synclist.NewProps{
@@ -190,13 +192,14 @@ func SyncListEdit(c *echo.Context) error {
 
 func SyncListUpdate(c *echo.Context) error {
 	var req struct {
-		Name              string `form:"Name" validate:"required,max=255"`
-		SrcHost           string `form:"SrcHost" validate:"required,max=255"`
-		SrcPort           int    `form:"SrcPort" validate:"required,min=1,max=65535"`
-		DstHost           string `form:"DstHost" validate:"required,max=255"`
-		DstPort           int    `form:"DstPort" validate:"required,min=1,max=65535"`
-		CompareMessageIds bool   `form:"CompareMessageIds" validate:"boolean"`
-		CompareLastUid    bool   `form:"CompareLastUid" validate:"boolean"`
+		Name                  string `form:"Name" validate:"required,max=255"`
+		SrcHost               string `form:"SrcHost" validate:"required,max=255"`
+		SrcPort               int    `form:"SrcPort" validate:"required,min=1,max=65535"`
+		DstHost               string `form:"DstHost" validate:"required,max=255"`
+		DstPort               int    `form:"DstPort" validate:"required,min=1,max=65535"`
+		EnableTlsVerification bool   `form:"EnableTlsVerification" validate:"boolean"`
+		CompareMessageIds     bool   `form:"CompareMessageIds" validate:"boolean"`
+		CompareLastUid        bool   `form:"CompareLastUid" validate:"boolean"`
 	}
 
 	id, err := helpers.ParamAsInt(c, "id")
@@ -253,6 +256,7 @@ func SyncListUpdate(c *echo.Context) error {
 
 		payload.SrcAddr = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
 		payload.DstAddr = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
+		payload.EnableTlsVerification = req.EnableTlsVerification
 		payload.CompareMessageIds = req.CompareMessageIds
 		payload.CompareLastUid = req.CompareLastUid
 
@@ -269,6 +273,7 @@ func SyncListUpdate(c *echo.Context) error {
 	list.SrcPort = req.SrcPort
 	list.DstHost = req.DstHost
 	list.DstPort = req.DstPort
+	list.EnableTlsVerification = req.EnableTlsVerification
 	list.CompareMessageIds = req.CompareMessageIds
 	list.CompareLastUid = req.CompareLastUid
 
@@ -277,9 +282,11 @@ func SyncListUpdate(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	err = models.UpdateJobs(c.Request().Context(), relatedJobs)
-	if err != nil {
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	if len(relatedJobs) > 0 {
+		err = models.UpdateJobs(c.Request().Context(), relatedJobs)
+		if err != nil {
+			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		}
 	}
 
 	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
@@ -441,7 +448,9 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 
 				payload.SrcAddr = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
 				payload.DstAddr = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
+				payload.EnableTlsVerification = list.EnableTlsVerification
 				payload.CompareMessageIds = list.CompareMessageIds
+				payload.CompareLastUid = list.CompareLastUid
 
 				json, err := json.Marshal(payload)
 				if err != nil {
@@ -455,13 +464,15 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 			}
 		} else {
 			payload := jobs.NewMigrateAccount(jobs.NewMigrateAccountParams{
-				SrcAddr:           net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
-				DstAddr:           net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
-				SrcUser:           account.SrcUser,
-				SrcPassword:       account.SrcPasswordHash,
-				DstUser:           account.DstUser,
-				DstPassword:       account.DstPasswordHash,
-				CompareMessageIDs: list.CompareMessageIds,
+				SrcAddr:               net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
+				DstAddr:               net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
+				SrcUser:               account.SrcUser,
+				SrcPasswordHash:       account.SrcPasswordHash,
+				DstUser:               account.DstUser,
+				DstPasswordHash:       account.DstPasswordHash,
+				EnableTlsVerification: list.EnableTlsVerification,
+				CompareMessageIDs:     list.CompareMessageIds,
+				CompareLastUid:        list.CompareLastUid,
 			})
 
 			data, err := json.Marshal(payload)

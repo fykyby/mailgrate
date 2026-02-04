@@ -8,6 +8,7 @@ CREATE TABLE sync_lists (
   src_port INT NOT NULL,
   dst_host VARCHAR(255) NOT NULL,
   dst_port INT NOT NULL,
+  enable_tls_verification BOOLEAN NOT NULL DEFAULT FALSE,
   compare_message_ids BOOLEAN NOT NULL DEFAULT FALSE,
   compare_last_uid BOOLEAN NOT NULL DEFAULT FALSE,
   FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,

@@ -19,46 +19,49 @@ import (
 var MigrateAccountType models.JobType = "migrate_account"
 
 type MigrateAccount struct {
-	SrcAddr           string
-	DstAddr           string
-	SrcUser           string
-	SrcPassword       string
-	DstUser           string
-	DstPassword       string
-	CompareMessageIds bool
-	CompareLastUid    bool
-	FolderLastUid     map[string]uint32
-	FolderUidValidity map[string]uint32
+	SrcAddr               string
+	DstAddr               string
+	SrcUser               string
+	SrcPasswordHash       string
+	DstUser               string
+	DstPasswordHash       string
+	EnableTlsVerification bool
+	CompareMessageIds     bool
+	CompareLastUid        bool
+	FolderLastUid         map[string]uint32
+	FolderUidValidity     map[string]uint32
 }
 
 type NewMigrateAccountParams struct {
-	SrcAddr           string
-	DstAddr           string
-	SrcUser           string
-	SrcPassword       string
-	DstUser           string
-	DstPassword       string
-	CompareMessageIDs bool
-	CompareLastUid    bool
+	SrcAddr               string
+	DstAddr               string
+	SrcUser               string
+	SrcPasswordHash       string
+	DstUser               string
+	DstPasswordHash       string
+	EnableTlsVerification bool
+	CompareMessageIDs     bool
+	CompareLastUid        bool
 }
 
 func NewMigrateAccount(params NewMigrateAccountParams) *MigrateAccount {
 	return &MigrateAccount{
-		SrcAddr:           params.SrcAddr,
-		DstAddr:           params.DstAddr,
-		SrcUser:           params.SrcUser,
-		SrcPassword:       params.SrcPassword,
-		DstUser:           params.DstUser,
-		DstPassword:       params.DstPassword,
-		CompareMessageIds: params.CompareMessageIDs,
-		CompareLastUid:    params.CompareLastUid,
-		FolderLastUid:     make(map[string]uint32),
-		FolderUidValidity: make(map[string]uint32),
+		SrcAddr:               params.SrcAddr,
+		DstAddr:               params.DstAddr,
+		SrcUser:               params.SrcUser,
+		SrcPasswordHash:       params.SrcPasswordHash,
+		DstUser:               params.DstUser,
+		DstPasswordHash:       params.DstPasswordHash,
+		EnableTlsVerification: params.EnableTlsVerification,
+		CompareMessageIds:     params.CompareMessageIDs,
+		CompareLastUid:        params.CompareLastUid,
+		FolderLastUid:         make(map[string]uint32),
+		FolderUidValidity:     make(map[string]uint32),
 	}
 }
 
 func (j *MigrateAccount) Run(ctx context.Context) (err error) {
-	slog.Debug("Starting account migration")
+	slog.Debug("Starting migration")
 
 	var srcClient *client.Client
 	var dstClient *client.Client
@@ -99,7 +102,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			}
 
 			err = srcClient.StartTLS(&tls.Config{
-				InsecureSkipVerify: config.Config.Debug,
+				InsecureSkipVerify: !j.EnableTlsVerification,
 			})
 			if err != nil {
 				slog.Debug("Failed to start source TLS", "error", err)
@@ -116,7 +119,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			}
 
 			err = dstClient.StartTLS(&tls.Config{
-				InsecureSkipVerify: config.Config.Debug,
+				InsecureSkipVerify: !j.EnableTlsVerification,
 			})
 			if err != nil {
 				slog.Debug("Failed to start destination TLS", "error", err)
@@ -136,13 +139,13 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 		return errors.New("dial timeout")
 	}
 
-	decryptedSrcPassword, err := helpers.AesDecrypt(j.SrcPassword, config.Config.AppKey)
+	decryptedSrcPassword, err := helpers.AesDecrypt(j.SrcPasswordHash, config.Config.AppKey)
 	if err != nil {
 		slog.Debug("Failed to decrypt source password", "error", err)
 		return err
 	}
 
-	decryptedDstPassword, err := helpers.AesDecrypt(j.DstPassword, config.Config.AppKey)
+	decryptedDstPassword, err := helpers.AesDecrypt(j.DstPasswordHash, config.Config.AppKey)
 	if err != nil {
 		slog.Debug("Failed to decrypt destination password", "error", err)
 		return err
@@ -237,8 +240,6 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			default:
 			}
 
-			slog.Debug("Fetched message", "uid", msg.Uid, "message-id", msg.Envelope.MessageId)
-
 			if j.CompareMessageIds {
 				dstCriteria := imap.NewSearchCriteria()
 				dstCriteria.Header.Set("Message-ID", msg.Envelope.MessageId)
@@ -267,7 +268,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 				continue
 			}
 
-			slog.Debug("Processing message", "messageID", msg.Envelope.MessageId)
+			slog.Debug("Migrating message", "messageID", msg.Envelope.MessageId)
 
 			literal := msg.GetBody(&imap.BodySectionName{})
 			if literal == nil {

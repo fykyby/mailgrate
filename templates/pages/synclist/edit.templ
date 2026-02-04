@@ -134,6 +134,28 @@ templ Edit(props EditProps) {
 				@form.Item() {
 					<div class="flex items-center gap-2">
 						@switchcomp.Switch(switchcomp.Props{
+							ID:      "EnableTlsVerification",
+							Name:    "EnableTlsVerification",
+							Value:   "true",
+							Checked: props.Values["EnableTlsVerification"] == "true",
+						})
+						@label.Label(label.Props{
+							For: "EnableTlsVerification",
+						}) {
+							Enable TLS Verification
+						}
+					</div>
+					if props.Errors["EnableTlsVerification"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["EnableTlsVerification"] }
+						}
+					}
+				}
+				@form.Item() {
+					<div class="flex items-center gap-2">
+						@switchcomp.Switch(switchcomp.Props{
 							ID:      "CompareMessageIds",
 							Name:    "CompareMessageIds",
 							Value:   "true",

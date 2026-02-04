@@ -11,15 +11,16 @@ import (
 type SyncList struct {
 	bun.BaseModel `bun:"table:sync_lists"`
 
-	Id                int `bun:",pk,autoincrement"`
-	UserId            int
-	Name              string
-	SrcHost           string
-	SrcPort           int
-	DstHost           string
-	DstPort           int
-	CompareMessageIds bool
-	CompareLastUid    bool
+	Id                    int `bun:",pk,autoincrement"`
+	UserId                int
+	Name                  string
+	SrcHost               string
+	SrcPort               int
+	DstHost               string
+	DstPort               int
+	EnableTlsVerification bool
+	CompareMessageIds     bool
+	CompareLastUid        bool
 }
 
 type SyncListsPaginated struct {
@@ -33,26 +34,28 @@ type SyncListStatus struct {
 }
 
 type CreateSyncListParams struct {
-	UserId            int
-	Name              string
-	SrcHost           string
-	SrcPort           int
-	DstHost           string
-	DstPort           int
-	CompareMessageIds bool
-	CompareLastUid    bool
+	UserId                int
+	Name                  string
+	SrcHost               string
+	SrcPort               int
+	DstHost               string
+	DstPort               int
+	EnableTlsVerification bool
+	CompareMessageIds     bool
+	CompareLastUid        bool
 }
 
 func CreateSyncList(ctx context.Context, params CreateSyncListParams) (*SyncList, error) {
 	syncList := &SyncList{
-		UserId:            params.UserId,
-		Name:              params.Name,
-		SrcHost:           params.SrcHost,
-		SrcPort:           params.SrcPort,
-		DstHost:           params.DstHost,
-		DstPort:           params.DstPort,
-		CompareMessageIds: params.CompareMessageIds,
-		CompareLastUid:    params.CompareLastUid,
+		UserId:                params.UserId,
+		Name:                  params.Name,
+		SrcHost:               params.SrcHost,
+		SrcPort:               params.SrcPort,
+		DstHost:               params.DstHost,
+		DstPort:               params.DstPort,
+		EnableTlsVerification: params.EnableTlsVerification,
+		CompareMessageIds:     params.CompareMessageIds,
+		CompareLastUid:        params.CompareLastUid,
 	}
 
 	_, err := db.Bun.
