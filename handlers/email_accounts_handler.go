@@ -285,7 +285,6 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 
 		payload.SrcAddr = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
 		payload.DstAddr = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
-		payload.EnableTlsVerification = list.EnableTlsVerification
 		payload.CompareLastUid = list.CompareLastUid
 		payload.CompareMessageIds = list.CompareMessageIds
 
@@ -311,15 +310,14 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 	}
 
 	payload := jobs.NewMigrateAccount(jobs.NewMigrateAccountParams{
-		SrcAddr:               net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
-		DstAddr:               net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
-		SrcUser:               account.SrcUser,
-		SrcPasswordHash:       account.SrcPasswordHash,
-		DstUser:               account.DstUser,
-		DstPasswordHash:       account.DstPasswordHash,
-		EnableTlsVerification: list.EnableTlsVerification,
-		CompareMessageIDs:     list.CompareMessageIds,
-		CompareLastUid:        list.CompareLastUid,
+		SrcAddr:           net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
+		DstAddr:           net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
+		SrcUser:           account.SrcUser,
+		SrcPasswordHash:   account.SrcPasswordHash,
+		DstUser:           account.DstUser,
+		DstPasswordHash:   account.DstPasswordHash,
+		CompareMessageIDs: list.CompareMessageIds,
+		CompareLastUid:    list.CompareLastUid,
 	})
 
 	data, err := json.Marshal(payload)

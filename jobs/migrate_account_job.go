@@ -19,44 +19,41 @@ import (
 var MigrateAccountType models.JobType = "migrate_account"
 
 type MigrateAccount struct {
-	SrcAddr               string
-	DstAddr               string
-	SrcUser               string
-	SrcPasswordHash       string
-	DstUser               string
-	DstPasswordHash       string
-	EnableTlsVerification bool
-	CompareMessageIds     bool
-	CompareLastUid        bool
-	FolderLastUid         map[string]uint32
-	FolderUidValidity     map[string]uint32
+	SrcAddr           string
+	DstAddr           string
+	SrcUser           string
+	SrcPasswordHash   string
+	DstUser           string
+	DstPasswordHash   string
+	CompareMessageIds bool
+	CompareLastUid    bool
+	FolderLastUid     map[string]uint32
+	FolderUidValidity map[string]uint32
 }
 
 type NewMigrateAccountParams struct {
-	SrcAddr               string
-	DstAddr               string
-	SrcUser               string
-	SrcPasswordHash       string
-	DstUser               string
-	DstPasswordHash       string
-	EnableTlsVerification bool
-	CompareMessageIDs     bool
-	CompareLastUid        bool
+	SrcAddr           string
+	DstAddr           string
+	SrcUser           string
+	SrcPasswordHash   string
+	DstUser           string
+	DstPasswordHash   string
+	CompareMessageIDs bool
+	CompareLastUid    bool
 }
 
 func NewMigrateAccount(params NewMigrateAccountParams) *MigrateAccount {
 	return &MigrateAccount{
-		SrcAddr:               params.SrcAddr,
-		DstAddr:               params.DstAddr,
-		SrcUser:               params.SrcUser,
-		SrcPasswordHash:       params.SrcPasswordHash,
-		DstUser:               params.DstUser,
-		DstPasswordHash:       params.DstPasswordHash,
-		EnableTlsVerification: params.EnableTlsVerification,
-		CompareMessageIds:     params.CompareMessageIDs,
-		CompareLastUid:        params.CompareLastUid,
-		FolderLastUid:         make(map[string]uint32),
-		FolderUidValidity:     make(map[string]uint32),
+		SrcAddr:           params.SrcAddr,
+		DstAddr:           params.DstAddr,
+		SrcUser:           params.SrcUser,
+		SrcPasswordHash:   params.SrcPasswordHash,
+		DstUser:           params.DstUser,
+		DstPasswordHash:   params.DstPasswordHash,
+		CompareMessageIds: params.CompareMessageIDs,
+		CompareLastUid:    params.CompareLastUid,
+		FolderLastUid:     make(map[string]uint32),
+		FolderUidValidity: make(map[string]uint32),
 	}
 }
 
@@ -102,7 +99,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			}
 
 			err = srcClient.StartTLS(&tls.Config{
-				InsecureSkipVerify: !j.EnableTlsVerification,
+				InsecureSkipVerify: config.Config.Debug,
 			})
 			if err != nil {
 				slog.Debug("Failed to start source TLS", "error", err)
@@ -119,7 +116,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			}
 
 			err = dstClient.StartTLS(&tls.Config{
-				InsecureSkipVerify: !j.EnableTlsVerification,
+				InsecureSkipVerify: config.Config.Debug,
 			})
 			if err != nil {
 				slog.Debug("Failed to start destination TLS", "error", err)
