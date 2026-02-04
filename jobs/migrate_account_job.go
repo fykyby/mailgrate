@@ -24,6 +24,7 @@ type MigrateAccount struct {
 	DstUser           string
 	DstPassword       string
 	CompareMessageIds bool
+	CompareLastUid    bool
 	FolderLastUid     map[string]uint32
 	FolderUidValidity map[string]uint32
 }
@@ -36,6 +37,7 @@ type NewMigrateAccountParams struct {
 	DstUser           string
 	DstPassword       string
 	CompareMessageIDs bool
+	CompareLastUid    bool
 }
 
 func NewMigrateAccount(params NewMigrateAccountParams) *MigrateAccount {
@@ -47,6 +49,7 @@ func NewMigrateAccount(params NewMigrateAccountParams) *MigrateAccount {
 		DstUser:           params.DstUser,
 		DstPassword:       params.DstPassword,
 		CompareMessageIds: params.CompareMessageIDs,
+		CompareLastUid:    params.CompareLastUid,
 		FolderLastUid:     make(map[string]uint32),
 		FolderUidValidity: make(map[string]uint32),
 	}
@@ -141,11 +144,14 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 		}
 
 		criteria := imap.NewSearchCriteria()
-		criteria.Uid = &imap.SeqSet{}
-		criteria.Uid.AddRange(j.FolderLastUid[folderName]+1, 4294967295)
+		if j.CompareLastUid {
+			criteria.Uid = &imap.SeqSet{}
+			criteria.Uid.AddRange(j.FolderLastUid[folderName]+1, 4294967295)
+		}
+
 		uids, err := srcClient.Search(criteria)
 		if err != nil {
-			slog.Debug("Failed to search for messages", "folder", folderName, "error", err)
+			slog.Debug("Failed to search for messages", "connection", "source", "folder", folderName, "error", err)
 			return err
 		}
 
@@ -186,30 +192,32 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			if j.CompareMessageIds {
 				dstCriteria := imap.NewSearchCriteria()
 				dstCriteria.Header.Set("Message-ID", msg.Envelope.MessageId)
+				dstCriteria.WithoutFlags = []string{"\\Deleted"}
 
-				_, err := dstClient.Select(folderName, true)
+				_, err = dstClient.Select(folderName, true)
 				if err != nil {
 					slog.Debug("Failed to select source folder", "folder", folderName, "error", err)
 					continue
 				}
 
-				existing, err := dstClient.Search(criteria)
+				existing, err := dstClient.Search(dstCriteria)
 				if err != nil {
-					slog.Debug("Failed to search for message", "error", err)
+					slog.Debug("Failed to search for messages", "connection", "destination", "folder", folderName, "error", err)
 					continue
 				}
 
 				if len(existing) > 0 {
-					slog.Debug("Message already exists in destination", "messageID", msg.Envelope.MessageId)
+					slog.Debug("Message-ID already exists in destination", "messageID", msg.Envelope.MessageId)
 					continue
-				} else {
-					slog.Debug("Message does not exist in destination", "messageID", msg.Envelope.MessageId)
 				}
 			}
 
-			if msg.Uid <= j.FolderLastUid[folderName] {
+			if j.CompareLastUid && msg.Uid <= j.FolderLastUid[folderName] {
+				slog.Debug("Message Uid is less than or equal to last UID", "messageID", msg.Envelope.MessageId)
 				continue
 			}
+
+			slog.Debug("Processing message", "messageID", msg.Envelope.MessageId)
 
 			literal := msg.GetBody(&imap.BodySectionName{})
 			if literal == nil {

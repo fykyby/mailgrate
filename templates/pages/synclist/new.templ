@@ -150,6 +150,28 @@ templ New(props NewProps) {
 						}
 					}
 				}
+				@form.Item() {
+					<div class="flex items-center gap-2">
+						@switchcomp.Switch(switchcomp.Props{
+							ID:      "CompareLastUid",
+							Name:    "CompareLastUid",
+							Value:   "true",
+							Checked: props.Values["CompareLastUid"] == "true",
+						})
+						@label.Label(label.Props{
+							For: "CompareLastUid",
+						}) {
+							Compare Last UID
+						}
+					</div>
+					if props.Errors["CompareLastUid"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["CompareLastUid"] }
+						}
+					}
+				}
 				if props.Errors["_Error"] != "" {
 					@alert.Error(props.Errors["_Error"])
 				}

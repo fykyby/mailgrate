@@ -40,10 +40,10 @@ func RegisterRoutes(e *echo.Echo) {
 	ar.GET("/app/sync-lists", handlers.SyncListIndex)
 	ar.GET("/app/sync-lists/new", handlers.SyncListNew)
 	ar.POST("/app/sync-lists", handlers.SyncListCreate)
-	ar.DELETE("/app/sync-lists/:id", handlers.SyncListDelete)
 	ar.GET("/app/sync-lists/:id", handlers.SyncListShow)
 	ar.GET("/app/sync-lists/:id/edit", handlers.SyncListEdit)
 	ar.PUT("/app/sync-lists/:id", handlers.SyncListUpdate)
+	ar.DELETE("/app/sync-lists/:id", handlers.SyncListDelete)
 
 	ar.GET("/app/sync-lists/:id/email-accounts/new", handlers.EmailAccountNew)
 	ar.POST("/app/sync-lists/:id/email-accounts", handlers.EmailAccountCreate)
@@ -51,6 +51,8 @@ func RegisterRoutes(e *echo.Echo) {
 
 	ar.POST("/app/sync-lists/:id/migrate/start", handlers.SyncListJobMigrateStart)
 	ar.POST("/app/sync-lists/:id/migrate/stop", handlers.SyncListJobMigrateStop)
+	ar.DELETE("/app/sync-lists/:id/migrate", handlers.SyncListDeleteJobs)
 	ar.POST("/app/sync-lists/:listID/email-accounts/:id/migrate/start", handlers.EmailAccountJobMigrateStart)
 	ar.POST("/app/sync-lists/:listID/email-accounts/:id/migrate/stop", handlers.EmailAccountJobMigrateStop)
+	ar.DELETE("/app/sync-lists/:listID/email-accounts/:id/migrate", handlers.EmailAccountDeleteJob)
 }

@@ -163,7 +163,60 @@ func EmailAccountDelete(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
+	page, err := helpers.QueryParamAsInt(c, "page")
+	if err != nil {
+		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
+	} else {
+		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id)+"?page="+strconv.Itoa(page))
+	}
+}
+
+func EmailAccountDeleteJob(c *echo.Context) error {
+	listID, err := helpers.ParamAsInt(c, "listID")
+	if err != nil {
+		return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
+	}
+
+	id, err := helpers.ParamAsInt(c, "id")
+	if err != nil {
+		return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
+	}
+
+	list, err := models.FindSyncListByID(c.Request().Context(), listID)
+	if err != nil {
+		if errorsx.IsNotFoundError(err) {
+			return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
+		}
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	if list.UserId != helpers.GetUserSessionData(c).ID {
+		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
+	}
+
+	account, err := models.FindEmailAccountByID(c.Request().Context(), id)
+	if err != nil {
+		if errorsx.IsNotFoundError(err) {
+			return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
+		}
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	if account.SyncListId != list.Id {
+		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
+	}
+
+	err = models.DeleteJobsByRelated(c.Request().Context(), "email_accounts", account.Id)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	page, err := helpers.QueryParamAsInt(c, "page")
+	if err != nil {
+		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
+	} else {
+		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id)+"?page="+strconv.Itoa(page))
+	}
 }
 
 func EmailAccountJobMigrateStart(c *echo.Context) error {

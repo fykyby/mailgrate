@@ -19,6 +19,7 @@ type SyncList struct {
 	DstHost           string
 	DstPort           int
 	CompareMessageIds bool
+	CompareLastUid    bool
 }
 
 type SyncListsPaginated struct {
@@ -39,6 +40,7 @@ type CreateSyncListParams struct {
 	DstHost           string
 	DstPort           int
 	CompareMessageIds bool
+	CompareLastUid    bool
 }
 
 func CreateSyncList(ctx context.Context, params CreateSyncListParams) (*SyncList, error) {
@@ -50,6 +52,7 @@ func CreateSyncList(ctx context.Context, params CreateSyncListParams) (*SyncList
 		DstHost:           params.DstHost,
 		DstPort:           params.DstPort,
 		CompareMessageIds: params.CompareMessageIds,
+		CompareLastUid:    params.CompareLastUid,
 	}
 
 	_, err := db.Bun.

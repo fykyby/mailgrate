@@ -66,6 +66,7 @@ func SyncListCreate(c *echo.Context) error {
 		DstHost           string `form:"DstHost" validate:"required,max=255"`
 		DstPort           int    `form:"DstPort" validate:"required,min=1,max=65535"`
 		CompareMessageIds bool   `form:"CompareMessageIds" validate:"boolean"`
+		CompareLastUid    bool   `form:"CompareLastUid" validate:"boolean"`
 	}
 
 	err := helpers.BindAndValidate(c, &req)
@@ -84,6 +85,7 @@ func SyncListCreate(c *echo.Context) error {
 		DstHost:           req.DstHost,
 		DstPort:           req.DstPort,
 		CompareMessageIds: req.CompareMessageIds,
+		CompareLastUid:    req.CompareLastUid,
 	})
 	if err != nil {
 		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", synclist.New(synclist.NewProps{
@@ -184,6 +186,7 @@ func SyncListUpdate(c *echo.Context) error {
 		DstHost           string `form:"DstHost" validate:"required,max=255"`
 		DstPort           int    `form:"DstPort" validate:"required,min=1,max=65535"`
 		CompareMessageIds bool   `form:"CompareMessageIds" validate:"boolean"`
+		CompareLastUid    bool   `form:"CompareLastUid" validate:"boolean"`
 	}
 
 	id, err := helpers.ParamAsInt(c, "id")
@@ -231,6 +234,24 @@ func SyncListUpdate(c *echo.Context) error {
 		if job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending {
 			return helpers.Render(c, http.StatusConflict, alert.Error(helpers.MsgErrForbidden))
 		}
+
+		payload := new(jobs.MigrateAccount)
+		err = json.Unmarshal(job.Payload, payload)
+		if err != nil {
+			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		}
+
+		payload.SrcAddr = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
+		payload.DstAddr = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
+		payload.CompareMessageIds = req.CompareMessageIds
+		payload.CompareLastUid = req.CompareLastUid
+
+		json, err := json.Marshal(payload)
+		if err != nil {
+			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		}
+
+		job.Payload = json
 	}
 
 	list.Name = req.Name
@@ -239,8 +260,14 @@ func SyncListUpdate(c *echo.Context) error {
 	list.DstHost = req.DstHost
 	list.DstPort = req.DstPort
 	list.CompareMessageIds = req.CompareMessageIds
+	list.CompareLastUid = req.CompareLastUid
 
 	err = models.UpdateSyncList(c.Request().Context(), list)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	err = models.UpdateJobs(c.Request().Context(), relatedJobs)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
@@ -293,6 +320,47 @@ func SyncListDelete(c *echo.Context) error {
 	}
 
 	return helpers.Redirect(c, "/app/sync-lists")
+}
+
+func SyncListDeleteJobs(c *echo.Context) error {
+	id, err := helpers.ParamAsInt(c, "id")
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	list, err := models.FindSyncListByID(c.Request().Context(), id)
+	if err != nil {
+		if errorsx.IsNotFoundError(err) {
+			return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
+		}
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	if list.UserId != helpers.GetUserSessionData(c).ID {
+		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
+	}
+
+	accounts, err := models.FindEmailAccountsBySyncListID(c.Request().Context(), list.Id)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	accountIDs := make([]int, len(accounts))
+	for i, account := range accounts {
+		accountIDs[i] = account.Id
+	}
+
+	err = models.DeleteJobsByRelatedBulk(c.Request().Context(), "email_accounts", accountIDs)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	page, err := helpers.QueryParamAsInt(c, "page")
+	if err != nil {
+		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
+	} else {
+		return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id)+"?page="+strconv.Itoa(page))
+	}
 }
 
 func SyncListJobMigrateStart(c *echo.Context) error {

@@ -103,6 +103,16 @@ templ Show(props ShowProps) {
 						@button.Button(button.Props{
 							Variant: button.VariantDestructive,
 							Attributes: templ.Attributes{
+								"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/migrate",
+								"hx-target": "#delete-sync-list-" + strconv.Itoa(props.SyncList.Id) + "-error",
+								"hx-swap":   "outerHTML",
+							},
+						}) {
+							Delete Jobs Only
+						}
+						@button.Button(button.Props{
+							Variant: button.VariantDestructive,
+							Attributes: templ.Attributes{
 								"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id),
 								"hx-target": "#delete-sync-list-" + strconv.Itoa(props.SyncList.Id) + "-error",
 								"hx-swap":   "outerHTML",
@@ -225,6 +235,16 @@ templ Show(props ShowProps) {
 											}) {
 												Cancel
 											}
+										}
+										@button.Button(button.Props{
+											Variant: button.VariantDestructive,
+											Attributes: templ.Attributes{
+												"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/" + strconv.Itoa(account.Id) + "/migrate",
+												"hx-target": "#delete-email-account-" + strconv.Itoa(account.Id) + "-error",
+												"hx-swap":   "outerHTML",
+											},
+										}) {
+											Delete Job Only
 										}
 										@button.Button(button.Props{
 											Variant: button.VariantDestructive,
