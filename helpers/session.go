@@ -32,7 +32,7 @@ func InitPostgresSessionStore() {
 		Path:     "/",
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
-		Secure:   !config.Config.IsDev,
+		Secure:   !config.Config.Debug,
 		SameSite: http.SameSiteLaxMode,
 	}
 

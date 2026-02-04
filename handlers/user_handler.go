@@ -260,7 +260,7 @@ func UserRequestPasswordReset(c *echo.Context) error {
 	message.SetHeader("From", config.Config.SMTPLogin)
 	message.SetHeader("To", u.Email)
 	message.SetHeader("Subject", fmt.Sprintf("%s | Password Reset", config.Config.AppName))
-	if config.Config.IsDev {
+	if config.Config.Debug {
 		message.SetBody("text/html", fmt.Sprintf("Password Reset Link: <a href='%s'>Click Here</a>", fmt.Sprintf("http://%s/password-reset/%s", c.Request().Host, token)))
 	} else {
 		message.SetBody("text/html", fmt.Sprintf("Password Reset Link: <a href='%s'>Click here</a>", fmt.Sprintf("https://%s/password-reset/%s", c.Request().Host, token)))

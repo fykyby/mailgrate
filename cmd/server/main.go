@@ -21,7 +21,7 @@ func main() {
 	config.InitConfig()
 
 	loggerOptions := &slog.HandlerOptions{}
-	if config.Config.IsDev {
+	if config.Config.Debug {
 		loggerOptions.Level = slog.LevelDebug
 	} else {
 		loggerOptions.Level = slog.LevelInfo
