@@ -404,20 +404,17 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	}
 
-	// Extract account IDs
 	accountIDs := make([]int, len(accounts))
 	for i, account := range accounts {
 		accountIDs[i] = account.Id
 	}
 
-	// Fetch existing jobs
 	existingJobs, err := models.FindJobsByRelatedBulk(ctx, "email_accounts", accountIDs)
 	if err != nil {
 		slog.Debug("Failed to find existing jobs", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	// Validate and organize jobs by account
 	jobsByAccountID := make(map[int]*models.Job)
 	for _, job := range existingJobs {
 		if _, exists := jobsByAccountID[job.RelatedId]; exists {
@@ -427,7 +424,6 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 		jobsByAccountID[job.RelatedId] = job
 	}
 
-	// Update existing jobs and collect new job payloads
 	jobsToUpdate := make([]*models.Job, 0)
 	newJobPayloads := make([]json.RawMessage, 0)
 	newJobAccountIDs := make([]int, 0)
@@ -435,7 +431,6 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 	for _, account := range accounts {
 		job, exists := jobsByAccountID[account.Id]
 		if exists {
-			// Update existing job if not already running/pending
 			if !(job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending) {
 				payload := new(jobs.MigrateAccount)
 				err := json.Unmarshal(job.Payload, payload)
@@ -479,7 +474,6 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 		}
 	}
 
-	// Update existing jobs
 	if len(jobsToUpdate) > 0 {
 		if err := models.UpdateJobs(ctx, jobsToUpdate); err != nil {
 			slog.Debug("Failed to update jobs", "error", err)
@@ -487,7 +481,6 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 		}
 	}
 
-	// Create new jobs
 	if len(newJobPayloads) > 0 {
 		_, err = models.CreateJobsWithRelated(ctx, userID, jobs.MigrateAccountType, newJobPayloads, "email_accounts", newJobAccountIDs)
 		if err != nil {
@@ -526,13 +519,11 @@ func SyncListJobMigrateStop(c *echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	}
 
-	// Extract account IDs
 	accountIDs := make([]int, len(accounts))
 	for i, account := range accounts {
 		accountIDs[i] = account.Id
 	}
 
-	// Fetch and cancel all running jobs
 	jobs, err := models.FindJobsByRelatedBulk(ctx, "email_accounts", accountIDs)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))

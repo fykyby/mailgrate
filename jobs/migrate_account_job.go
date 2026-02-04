@@ -64,7 +64,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 	defer srcClient.Logout()
 
 	err = srcClient.StartTLS(&tls.Config{
-		InsecureSkipVerify: config.Config.IsDev,
+		InsecureSkipVerify: config.Config.Debug,
 	})
 	if err != nil {
 		slog.Debug("Failed to start source TLS", "error", err)
@@ -79,7 +79,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 	defer dstClient.Logout()
 
 	err = dstClient.StartTLS(&tls.Config{
-		InsecureSkipVerify: config.Config.IsDev,
+		InsecureSkipVerify: config.Config.Debug,
 	})
 	if err != nil {
 		slog.Debug("Failed to start destination TLS", "error", err)

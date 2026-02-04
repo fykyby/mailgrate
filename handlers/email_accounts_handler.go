@@ -234,7 +234,6 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 	ctx := c.Request().Context()
 	userID := helpers.GetUserSessionData(c).ID
 
-	// Fetch list and account in parallel
 	listChan := make(chan *models.SyncList, 1)
 	accountChan := make(chan *models.EmailAccount, 1)
 	errChan := make(chan error, 2)
@@ -258,13 +257,11 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	// Validate ownership
 	if list.UserId != userID || account.SyncListId != list.Id {
 		slog.Debug("Invalid ownership", "listID", list.Id, "userID", userID, "accountID", account.Id)
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	// Get existing job
 	job, err := models.FindJobByRelated(ctx, "email_accounts", account.Id)
 	if err != nil {
 		if !errorsx.IsNotFoundError(err) {
@@ -273,7 +270,6 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 		}
 	}
 
-	// Handle existing job
 	if job.Id != 0 {
 		if job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending {
 			slog.Debug("Job already running or pending", "jobID", job.Id)
@@ -311,7 +307,6 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 		}
 	}
 
-	// Create new job
 	payload := jobs.NewMigrateAccount(jobs.NewMigrateAccountParams{
 		SrcAddr:           net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
 		DstAddr:           net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
@@ -356,7 +351,6 @@ func EmailAccountJobMigrateStop(c *echo.Context) error {
 	ctx := c.Request().Context()
 	userID := helpers.GetUserSessionData(c).ID
 
-	// Fetch list and account in parallel
 	listChan := make(chan *models.SyncList, 1)
 	accountChan := make(chan *models.EmailAccount, 1)
 	errChan := make(chan error, 2)
@@ -379,12 +373,10 @@ func EmailAccountJobMigrateStop(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	// Validate ownership
 	if list.Id != userID || account.SyncListId != list.Id {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	// Get existing job
 	job, err := models.FindJobByRelated(ctx, "email_accounts", account.Id)
 	if err != nil {
 		if errorsx.IsNotFoundError(err) {
@@ -393,12 +385,10 @@ func EmailAccountJobMigrateStop(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	// Job must exist and be stoppable
 	if job == nil || !(job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending) {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	// Get and cancel running job
 	runningJob := worker.GetRunningJob(job.Id)
 	if runningJob == nil {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))

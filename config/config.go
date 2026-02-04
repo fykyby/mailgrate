@@ -10,7 +10,7 @@ import (
 type config struct {
 	AppName                  string
 	AppKey                   string
-	IsDev                    bool
+	Debug                    bool
 	Port                     int
 	DatabaseURL              string
 	WorkerCount              int
@@ -30,7 +30,7 @@ func InitConfig() {
 
 	cfg.AppName = os.Getenv("APP_NAME")
 	cfg.AppKey = os.Getenv("APP_KEY")
-	cfg.IsDev = os.Getenv("ENV") == "dev"
+	cfg.Debug = os.Getenv("DEBUG") == "true"
 	cfg.Port, _ = strconv.Atoi(os.Getenv("PORT"))
 	cfg.DatabaseURL = os.Getenv("DB_URI")
 	cfg.WorkerCount, _ = strconv.Atoi(os.Getenv("WORKER_COUNT"))
