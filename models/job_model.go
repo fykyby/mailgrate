@@ -94,7 +94,34 @@ func CreateJobs(ctx context.Context, userID int, jobType JobType, payload []json
 
 	_, err := db.Bun.
 		NewInsert().
-		Model(jobs).
+		Model(&jobs).
+		Exec(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return jobs, nil
+}
+
+func CreateJobsWithRelated(ctx context.Context, userID int, jobType JobType, payloads []json.RawMessage, relatedTable string, relatedIDs []int) ([]*Job, error) {
+	jobs := make([]*Job, 0, len(payloads))
+
+	for i, p := range payloads {
+		job := &Job{
+			UserID:       userID,
+			Type:         jobType,
+			Status:       JobStatusPending,
+			Payload:      p,
+			RelatedTable: relatedTable,
+			RelatedID:    relatedIDs[i],
+		}
+
+		jobs = append(jobs, job)
+	}
+
+	_, err := db.Bun.
+		NewInsert().
+		Model(&jobs).
 		Exec(ctx)
 	if err != nil {
 		return nil, err
@@ -132,7 +159,7 @@ func FindJobByRelated(ctx context.Context, relatedTable string, relatedID int) (
 
 	err := db.Bun.
 		NewSelect().
-		Model(&jobs).
+		Model(jobs).
 		Where("related_table = ?", relatedTable).
 		Where("related_id = ?", relatedID).
 		Scan(ctx)

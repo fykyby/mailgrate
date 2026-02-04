@@ -285,6 +285,7 @@ func SyncListDelete(c *echo.Context) error {
 func SyncListJobMigrateStart(c *echo.Context) error {
 	id, err := helpers.ParamAsInt(c, "id")
 	if err != nil {
+		slog.Debug("Invalid ID parameter", "error", err)
 		return helpers.Render(c, http.StatusBadRequest, alert.Error(helpers.MsgErrBadRequest))
 	}
 
@@ -293,15 +294,18 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 
 	list, err := models.FindSyncListByID(ctx, id)
 	if err != nil {
+		slog.Debug("Failed to find sync list", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
 	if list.UserID != userID {
+		slog.Debug("Unauthorized access attempt", "userID", userID, "listID", id)
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
 	accounts, err := models.FindEmailAccountsBySyncListID(ctx, list.ID)
 	if err != nil {
+		slog.Debug("Failed to find email accounts", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
@@ -318,6 +322,7 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 	// Fetch existing jobs
 	existingJobs, err := models.FindJobsByRelatedMany(ctx, "email_accounts", accountIDs)
 	if err != nil {
+		slog.Debug("Failed to find existing jobs", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
@@ -334,6 +339,7 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 	// Update existing jobs and collect new job payloads
 	jobsToUpdate := make([]*models.Job, 0)
 	newJobPayloads := make([]json.RawMessage, 0)
+	newJobAccountIDs := make([]int, 0)
 
 	for _, account := range accounts {
 		job, exists := jobsByAccountID[account.ID]
@@ -343,6 +349,7 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 				payload := new(jobs.MigrateAccount)
 				err := json.Unmarshal(job.Payload, payload)
 				if err != nil {
+					slog.Debug("Failed to unmarshal job payload", "error", err)
 					return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 				}
 
@@ -351,6 +358,7 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 
 				json, err := json.Marshal(payload)
 				if err != nil {
+					slog.Debug("Failed to marshal job payload", "error", err)
 					return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 				}
 
@@ -371,23 +379,27 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 
 			data, err := json.Marshal(payload)
 			if err != nil {
+				slog.Debug("Failed to marshal job payload", "error", err)
 				return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 			}
 			newJobPayloads = append(newJobPayloads, data)
+			newJobAccountIDs = append(newJobAccountIDs, account.ID)
 		}
 	}
 
 	// Update existing jobs
 	if len(jobsToUpdate) > 0 {
 		if err := models.UpdateJobs(ctx, jobsToUpdate); err != nil {
+			slog.Debug("Failed to update jobs", "error", err)
 			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 		}
 	}
 
 	// Create new jobs
 	if len(newJobPayloads) > 0 {
-		_, err = models.CreateJobs(ctx, userID, jobs.MigrateAccountType, newJobPayloads)
+		_, err = models.CreateJobsWithRelated(ctx, userID, jobs.MigrateAccountType, newJobPayloads, "email_accounts", newJobAccountIDs)
 		if err != nil {
+			slog.Debug("Failed to create jobs", "error", err)
 			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 		}
 	}

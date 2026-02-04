@@ -11,6 +11,7 @@ import (
 	"app/templates/pages/synclist/emailaccounts"
 	"app/worker"
 	"encoding/json"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
@@ -157,10 +158,12 @@ func EmailAccountDelete(c *echo.Context) error {
 func EmailAccountJobMigrateStart(c *echo.Context) error {
 	listID, err := helpers.ParamAsInt(c, "listID")
 	if err != nil {
+		slog.Debug("Failed to parse list ID", "error", err)
 		return helpers.Render(c, http.StatusBadRequest, alert.Error(helpers.MsgErrBadRequest))
 	}
 	accountID, err := helpers.ParamAsInt(c, "id")
 	if err != nil {
+		slog.Debug("Failed to parse account ID", "error", err)
 		return helpers.Render(c, http.StatusBadRequest, alert.Error(helpers.MsgErrBadRequest))
 	}
 
@@ -187,29 +190,36 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 	list := <-listChan
 	account := <-accountChan
 	if err := <-errChan; err != nil || <-errChan != nil {
+		slog.Debug("Failed to fetch list or account", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
 	// Validate ownership
-	if list.ID != userID || account.SyncListID != list.ID {
+	if list.UserID != userID || account.SyncListID != list.ID {
+		slog.Debug("Invalid ownership", "listID", list.ID, "userID", userID, "accountID", account.ID)
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
 	// Get existing job
 	job, err := models.FindJobByRelated(ctx, "email_accounts", account.ID)
 	if err != nil {
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		if !errorsx.IsNotFoundError(err) {
+			slog.Debug("Failed to find job", "error", err)
+			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		}
 	}
 
 	// Handle existing job
-	if job != nil {
+	if job.ID != 0 {
 		if job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending {
+			slog.Debug("Job already running or pending", "jobID", job.ID)
 			return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 		}
 
 		payload := new(jobs.MigrateAccount)
 		err := json.Unmarshal(job.Payload, payload)
 		if err != nil {
+			slog.Debug("Failed to unmarshal job payload", "error", err)
 			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 		}
 
@@ -218,15 +228,23 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 
 		json, err := json.Marshal(payload)
 		if err != nil {
+			slog.Debug("Failed to marshal payload", "error", err)
 			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 		}
 
 		job.Payload = json
 		job.Status = models.JobStatusPending
 		if err := models.UpdateJob(ctx, job); err != nil {
+			slog.Debug("Failed to update job", "error", err)
 			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 		}
-		return c.NoContent(http.StatusOK)
+
+		page, err := helpers.QueryParamAsInt(c, "page")
+		if err != nil {
+			return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
+		} else {
+			return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID)+"?page="+strconv.Itoa(page))
+		}
 	}
 
 	// Create new job
@@ -241,11 +259,13 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 
 	data, err := json.Marshal(payload)
 	if err != nil {
+		slog.Debug("Failed to marshal payload", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	_, err = models.CreateJob(ctx, userID, jobs.MigrateAccountType, data)
+	_, err = models.CreateJobWithRelated(ctx, userID, jobs.MigrateAccountType, "email_accounts", accountID, data)
 	if err != nil {
+		slog.Debug("Failed to create job", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
