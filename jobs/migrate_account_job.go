@@ -1,6 +1,8 @@
 package jobs
 
 import (
+	"app/config"
+	"app/helpers"
 	"app/models"
 	"context"
 	"strings"
@@ -45,11 +47,16 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 	}
 	defer destClient.Close()
 
-	if err := sourceClient.Login(j.Login, j.Password); err != nil {
+	decryptedPassword, err := helpers.AesDecrypt(j.Password, config.Config.AppKey)
+	if err != nil {
 		return err
 	}
 
-	if err := destClient.Login(j.Login, j.Password); err != nil {
+	if err := sourceClient.Login(j.Login, decryptedPassword); err != nil {
+		return err
+	}
+
+	if err := destClient.Login(j.Login, decryptedPassword); err != nil {
 		return err
 	}
 

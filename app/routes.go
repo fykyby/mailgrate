@@ -48,4 +48,9 @@ func RegisterRoutes(e *echo.Echo) {
 	ar.GET("/app/sync-lists/:id/email-accounts/new", handlers.EmailAccountNew)
 	ar.POST("/app/sync-lists/:id/email-accounts", handlers.EmailAccountCreate)
 	ar.DELETE("/app/sync-lists/:listID/email-accounts/:id", handlers.EmailAccountDelete)
+
+	ar.POST("/app/sync-lists/:id/migrate/start", handlers.SyncListJobMigrateStart)
+	ar.POST("/app/sync-lists/:id/migrate/stop", handlers.SyncListJobMigrateStop)
+	ar.POST("/app/sync-lists/:listID/email-accounts/:id/migrate/start", handlers.EmailAccountJobMigrateStart)
+	ar.POST("/app/sync-lists/:listID/email-accounts/:id/migrate/stop", handlers.EmailAccountJobMigrateStop)
 }

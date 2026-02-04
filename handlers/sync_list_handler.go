@@ -3,11 +3,16 @@ package handlers
 import (
 	"app/errorsx"
 	"app/helpers"
+	"app/jobs"
 	"app/models"
 	"app/templates/components/alert"
 	"app/templates/pages"
 	"app/templates/pages/synclist"
+	"app/worker"
+	"encoding/json"
 	"log"
+	"log/slog"
+	"net"
 	"net/http"
 	"strconv"
 
@@ -169,14 +174,6 @@ func SyncListUpdate(c *echo.Context) error {
 		DestinationPort int    `form:"DestinationPort" validate:"required,min=1,max=65535"`
 	}
 
-	err := helpers.BindAndValidate(c, &req)
-	if err != nil {
-		return helpers.RenderFragment(c, http.StatusBadRequest, "form", synclist.New(synclist.NewProps{
-			Values: helpers.FormatValues(c),
-			Errors: helpers.FormatErrors(err),
-		}))
-	}
-
 	id, err := helpers.ParamAsInt(c, "id")
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
@@ -190,8 +187,38 @@ func SyncListUpdate(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
+	err = helpers.BindAndValidate(c, &req)
+	if err != nil {
+		return helpers.RenderFragment(c, http.StatusBadRequest, "form", synclist.Edit(synclist.EditProps{
+			List:   list,
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
+		}))
+	}
+
 	if list.UserID != helpers.GetUserSessionData(c).ID {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
+	}
+
+	accounts, err := models.FindEmailAccountsBySyncListID(c.Request().Context(), list.ID)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	accountIDs := make([]int, len(accounts))
+	for i, account := range accounts {
+		accountIDs[i] = account.ID
+	}
+
+	relatedJobs, err := models.FindJobsByRelatedMany(c.Request().Context(), "email_accounts", accountIDs)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	for _, job := range relatedJobs {
+		if job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending {
+			return helpers.Render(c, http.StatusConflict, alert.Error(helpers.MsgErrForbidden))
+		}
 	}
 
 	list.Name = req.Name
@@ -226,6 +253,27 @@ func SyncListDelete(c *echo.Context) error {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
+	accounts, err := models.FindEmailAccountsBySyncListID(c.Request().Context(), list.ID)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	accountIDs := make([]int, len(accounts))
+	for i, account := range accounts {
+		accountIDs[i] = account.ID
+	}
+
+	relatedJobs, err := models.FindJobsByRelatedMany(c.Request().Context(), "email_accounts", accountIDs)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	for _, job := range relatedJobs {
+		if job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending {
+			return helpers.Render(c, http.StatusConflict, alert.Error(helpers.MsgErrForbidden))
+		}
+	}
+
 	err = models.DeleteSyncListByID(c.Request().Context(), id)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
@@ -235,9 +283,163 @@ func SyncListDelete(c *echo.Context) error {
 }
 
 func SyncListJobMigrateStart(c *echo.Context) error {
-	return c.String(200, "ok")
+	id, err := helpers.ParamAsInt(c, "id")
+	if err != nil {
+		return helpers.Render(c, http.StatusBadRequest, alert.Error(helpers.MsgErrBadRequest))
+	}
+
+	ctx := c.Request().Context()
+	userID := helpers.GetUserSessionData(c).ID
+
+	list, err := models.FindSyncListByID(ctx, id)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	if list.UserID != userID {
+		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
+	}
+
+	accounts, err := models.FindEmailAccountsBySyncListID(ctx, list.ID)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	if len(accounts) == 0 {
+		return c.NoContent(http.StatusOK)
+	}
+
+	// Extract account IDs
+	accountIDs := make([]int, len(accounts))
+	for i, account := range accounts {
+		accountIDs[i] = account.ID
+	}
+
+	// Fetch existing jobs
+	existingJobs, err := models.FindJobsByRelatedMany(ctx, "email_accounts", accountIDs)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	// Validate and organize jobs by account
+	jobsByAccountID := make(map[int]*models.Job)
+	for _, job := range existingJobs {
+		if _, exists := jobsByAccountID[job.RelatedID]; exists {
+			slog.Error("multiple jobs found for email account", "email_account", job.RelatedID)
+			return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
+		}
+		jobsByAccountID[job.RelatedID] = job
+	}
+
+	// Update existing jobs and collect new job payloads
+	jobsToUpdate := make([]*models.Job, 0)
+	newJobPayloads := make([]json.RawMessage, 0)
+
+	for _, account := range accounts {
+		job, exists := jobsByAccountID[account.ID]
+		if exists {
+			// Update existing job if not already running/pending
+			if !(job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending) {
+				payload := new(jobs.MigrateAccount)
+				err := json.Unmarshal(job.Payload, payload)
+				if err != nil {
+					return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+				}
+
+				payload.Source = net.JoinHostPort(list.SourceHost, strconv.Itoa(list.SourcePort))
+				payload.Destination = net.JoinHostPort(list.DestinationHost, strconv.Itoa(list.DestinationPort))
+
+				json, err := json.Marshal(payload)
+				if err != nil {
+					return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+				}
+
+				job.Payload = json
+				job.Status = models.JobStatusPending
+				jobsToUpdate = append(jobsToUpdate, job)
+			}
+		} else {
+			// Create new job
+			payload := jobs.MigrateAccount{
+				Source:            net.JoinHostPort(list.SourceHost, strconv.Itoa(list.SourcePort)),
+				Destination:       net.JoinHostPort(list.DestinationHost, strconv.Itoa(list.DestinationPort)),
+				Login:             account.Login,
+				Password:          account.Password,
+				FolderLastUid:     make(map[string]uint32),
+				FolderUidValidity: make(map[string]uint32),
+			}
+
+			data, err := json.Marshal(payload)
+			if err != nil {
+				return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+			}
+			newJobPayloads = append(newJobPayloads, data)
+		}
+	}
+
+	// Update existing jobs
+	if len(jobsToUpdate) > 0 {
+		if err := models.UpdateJobs(ctx, jobsToUpdate); err != nil {
+			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		}
+	}
+
+	// Create new jobs
+	if len(newJobPayloads) > 0 {
+		_, err = models.CreateJobs(ctx, userID, jobs.MigrateAccountType, newJobPayloads)
+		if err != nil {
+			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		}
+	}
+
+	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
 }
 
 func SyncListJobMigrateStop(c *echo.Context) error {
-	return c.String(200, "ok")
+	id, err := helpers.ParamAsInt(c, "id")
+	if err != nil {
+		return helpers.Render(c, http.StatusBadRequest, alert.Error(helpers.MsgErrBadRequest))
+	}
+
+	ctx := c.Request().Context()
+	userID := helpers.GetUserSessionData(c).ID
+
+	list, err := models.FindSyncListByID(ctx, id)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	if list.UserID != userID {
+		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
+	}
+
+	accounts, err := models.FindEmailAccountsBySyncListID(ctx, list.ID)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	if len(accounts) == 0 {
+		return c.NoContent(http.StatusOK)
+	}
+
+	// Extract account IDs
+	accountIDs := make([]int, len(accounts))
+	for i, account := range accounts {
+		accountIDs[i] = account.ID
+	}
+
+	// Fetch and cancel all running jobs
+	jobs, err := models.FindJobsByRelatedMany(ctx, "email_accounts", accountIDs)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	}
+
+	for _, job := range jobs {
+		runningJob := worker.GetRunningJob(job.ID)
+		if runningJob != nil {
+			runningJob.Cancel()
+		}
+	}
+
+	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.ID))
 }

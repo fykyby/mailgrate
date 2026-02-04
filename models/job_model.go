@@ -127,6 +127,18 @@ func FindJobsByIDs(ctx context.Context, ids []int) ([]*Job, error) {
 	return jobs, err
 }
 
+func FindJobByRelated(ctx context.Context, relatedTable string, relatedID int) (*Job, error) {
+	jobs := new(Job)
+
+	err := db.Bun.
+		NewSelect().
+		Model(&jobs).
+		Where("related_table = ?", relatedTable).
+		Where("related_id = ?", relatedID).
+		Scan(ctx)
+
+	return jobs, err
+}
 func FindJobsByRelated(ctx context.Context, relatedTable string, relatedID int) ([]*Job, error) {
 	jobs := make([]*Job, 0)
 
