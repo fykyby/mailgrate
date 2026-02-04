@@ -8,17 +8,18 @@ import (
 )
 
 type config struct {
-	AppName           string
-	AppKey            string
-	IsDev             bool
-	Port              int
-	DatabaseURL       string
-	WorkerCount       int
-	JobTimeoutMinutes int
-	SMTPHost          string
-	SMTPPort          int
-	SMTPLogin         string
-	SMTPPassword      string
+	AppName                  string
+	AppKey                   string
+	IsDev                    bool
+	Port                     int
+	DatabaseURL              string
+	WorkerCount              int
+	JobTimeoutMinutes        int
+	SMTPHost                 string
+	SMTPPort                 int
+	SMTPLogin                string
+	SMTPPassword             string
+	RequireEmailConfirmation bool
 }
 
 var Config *config
@@ -38,6 +39,7 @@ func InitConfig() {
 	cfg.SMTPPort, _ = strconv.Atoi(os.Getenv("SMTP_PORT"))
 	cfg.SMTPLogin = os.Getenv("SMTP_LOGIN")
 	cfg.SMTPPassword = os.Getenv("SMTP_PASSWORD")
+	cfg.RequireEmailConfirmation = os.Getenv("REQUIRE_EMAIL_CONFIRMATION") == "true"
 
 	Config = cfg
 }

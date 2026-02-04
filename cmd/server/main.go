@@ -57,7 +57,10 @@ func main() {
 	app.RegisterMiddleware(e)
 	app.RegisterRoutes(e)
 	app.RegisterJobs()
-	app.RunBackgroundCleanUp(context.Background())
+
+	if config.Config.RequireEmailConfirmation {
+		app.RunBackgroundCleanUp(context.Background())
+	}
 
 	if err := app.Start(e); err != nil {
 		slog.Error(err.Error())
