@@ -44,8 +44,10 @@ func EmailAccountNew(c *echo.Context) error {
 
 func EmailAccountCreate(c *echo.Context) error {
 	var req struct {
-		Login    string `form:"Login" validate:"email,required,max=255"`
-		Password string `form:"Password" validate:"required,max=255"`
+		SrcUser     string `form:"SrcUser" validate:"email,required,max=255"`
+		SrcPassword string `form:"SrcPassword" validate:"required,max=255"`
+		DstUser     string `form:"DstUser" validate:"email,required,max=255"`
+		DstPassword string `form:"DstPassword" validate:"required,max=255"`
 	}
 
 	id, err := helpers.ParamAsInt(c, "id")
@@ -80,7 +82,7 @@ func EmailAccountCreate(c *echo.Context) error {
 		}))
 	}
 
-	encryptedPassword, err := helpers.AesEncrypt(req.Password, config.Config.AppKey)
+	encryptedSrcPassword, err := helpers.AesEncrypt(req.SrcPassword, config.Config.AppKey)
 	if err != nil {
 		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", emailaccounts.New(emailaccounts.NewProps{
 			List:   list,
@@ -89,7 +91,16 @@ func EmailAccountCreate(c *echo.Context) error {
 		}))
 	}
 
-	_, err = models.CreateEmailAccount(c.Request().Context(), list.ID, req.Login, encryptedPassword)
+	encryptedDstPassword, err := helpers.AesEncrypt(req.DstPassword, config.Config.AppKey)
+	if err != nil {
+		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", emailaccounts.New(emailaccounts.NewProps{
+			List:   list,
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
+		}))
+	}
+
+	_, err = models.CreateEmailAccount(c.Request().Context(), list.ID, req.SrcUser, encryptedSrcPassword, req.DstUser, encryptedDstPassword)
 	if err != nil {
 		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", emailaccounts.New(emailaccounts.NewProps{
 			List:   list,
@@ -223,8 +234,8 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 		}
 
-		payload.Source = net.JoinHostPort(list.SourceHost, strconv.Itoa(list.SourcePort))
-		payload.Destination = net.JoinHostPort(list.DestinationHost, strconv.Itoa(list.DestinationPort))
+		payload.Source = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
+		payload.Destination = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
 
 		json, err := json.Marshal(payload)
 		if err != nil {
@@ -249,10 +260,12 @@ func EmailAccountJobMigrateStart(c *echo.Context) error {
 
 	// Create new job
 	payload := jobs.MigrateAccount{
-		Source:            net.JoinHostPort(list.SourceHost, strconv.Itoa(list.SourcePort)),
-		Destination:       net.JoinHostPort(list.DestinationHost, strconv.Itoa(list.DestinationPort)),
-		Login:             account.Login,
-		Password:          account.Password,
+		Source:            net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
+		Destination:       net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
+		SrcUser:           account.SrcUser,
+		SrcPassword:       account.SrcPasswordHash,
+		DstUser:           account.DstUser,
+		DstPassword:       account.DstPasswordHash,
 		FolderLastUid:     make(map[string]uint32),
 		FolderUidValidity: make(map[string]uint32),
 	}

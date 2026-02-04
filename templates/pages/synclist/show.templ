@@ -130,7 +130,10 @@ templ Show(props ShowProps) {
 						ID
 					}
 					@table.Head() {
-						User
+						Source User
+					}
+					@table.Head() {
+						Destination User
 					}
 					@table.Head() {
 						Status
@@ -155,7 +158,10 @@ templ Show(props ShowProps) {
 							{ account.ID }
 						}
 						@table.Cell() {
-							{ account.Login }
+							{ account.SrcUser }
+						}
+						@table.Cell() {
+							{ account.DstUser }
 						}
 						@table.Cell() {
 							@badge.Badge(badge.Props{
@@ -208,7 +214,7 @@ templ Show(props ShowProps) {
 											Are you sure?
 										}
 										@dialog.Description() {
-											This action will permanently delete "{ account.Login }" from "{ props.SyncList.Name }".
+											This action will permanently delete "{ account.SrcUser } - { account.DstUser }" from "{ props.SyncList.Name }".
 										}
 									}
 									<div id={ "delete-email-account-" + strconv.Itoa(account.ID) + "-error" }></div>

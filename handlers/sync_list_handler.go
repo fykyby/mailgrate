@@ -58,11 +58,11 @@ func SyncListNew(c *echo.Context) error {
 
 func SyncListCreate(c *echo.Context) error {
 	var req struct {
-		Name            string `form:"Name" validate:"required,max=255"`
-		SourceHost      string `form:"SourceHost" validate:"required,max=255"`
-		SourcePort      int    `form:"SourcePort" validate:"required,min=1,max=65535"`
-		DestinationHost string `form:"DestinationHost" validate:"required,max=255"`
-		DestinationPort int    `form:"DestinationPort" validate:"required,min=1,max=65535"`
+		Name    string `form:"Name" validate:"required,max=255"`
+		SrcHost string `form:"SrcHost" validate:"required,max=255"`
+		SrcPort int    `form:"SrcPort" validate:"required,min=1,max=65535"`
+		DstHost string `form:"DstHost" validate:"required,max=255"`
+		DstPort int    `form:"DstPort" validate:"required,min=1,max=65535"`
 	}
 
 	err := helpers.BindAndValidate(c, &req)
@@ -73,7 +73,7 @@ func SyncListCreate(c *echo.Context) error {
 		}))
 	}
 
-	list, err := models.CreateSyncList(c.Request().Context(), helpers.GetUserSessionData(c).ID, req.Name, req.SourceHost, req.SourcePort, req.DestinationHost, req.DestinationPort)
+	list, err := models.CreateSyncList(c.Request().Context(), helpers.GetUserSessionData(c).ID, req.Name, req.SrcHost, req.SrcPort, req.DstHost, req.DstPort)
 	if err != nil {
 		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", synclist.New(synclist.NewProps{
 			Values: helpers.FormatValues(c),
@@ -117,7 +117,7 @@ func SyncListShow(c *echo.Context) error {
 		accountIDs[i] = account.ID
 	}
 
-	jobs, err := models.FindJobsByRelatedMany(c.Request().Context(), "email_accounts", accountIDs)
+	jobs, err := models.FindJobsByRelatedBulk(c.Request().Context(), "email_accounts", accountIDs)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
@@ -167,11 +167,11 @@ func SyncListEdit(c *echo.Context) error {
 
 func SyncListUpdate(c *echo.Context) error {
 	var req struct {
-		Name            string `form:"Name" validate:"required,max=255"`
-		SourceHost      string `form:"SourceHost" validate:"required,max=255"`
-		SourcePort      int    `form:"SourcePort" validate:"required,min=1,max=65535"`
-		DestinationHost string `form:"DestinationHost" validate:"required,max=255"`
-		DestinationPort int    `form:"DestinationPort" validate:"required,min=1,max=65535"`
+		Name    string `form:"Name" validate:"required,max=255"`
+		SrcHost string `form:"SrcHost" validate:"required,max=255"`
+		SrcPort int    `form:"SrcPort" validate:"required,min=1,max=65535"`
+		DstHost string `form:"DstHost" validate:"required,max=255"`
+		DstPort int    `form:"DstPort" validate:"required,min=1,max=65535"`
 	}
 
 	id, err := helpers.ParamAsInt(c, "id")
@@ -210,7 +210,7 @@ func SyncListUpdate(c *echo.Context) error {
 		accountIDs[i] = account.ID
 	}
 
-	relatedJobs, err := models.FindJobsByRelatedMany(c.Request().Context(), "email_accounts", accountIDs)
+	relatedJobs, err := models.FindJobsByRelatedBulk(c.Request().Context(), "email_accounts", accountIDs)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
@@ -222,10 +222,10 @@ func SyncListUpdate(c *echo.Context) error {
 	}
 
 	list.Name = req.Name
-	list.SourceHost = req.SourceHost
-	list.SourcePort = req.SourcePort
-	list.DestinationHost = req.DestinationHost
-	list.DestinationPort = req.DestinationPort
+	list.SrcHost = req.SrcHost
+	list.SrcPort = req.SrcPort
+	list.DstHost = req.DstHost
+	list.DstPort = req.DstPort
 
 	err = models.UpdateSyncList(c.Request().Context(), list)
 	if err != nil {
@@ -263,7 +263,7 @@ func SyncListDelete(c *echo.Context) error {
 		accountIDs[i] = account.ID
 	}
 
-	relatedJobs, err := models.FindJobsByRelatedMany(c.Request().Context(), "email_accounts", accountIDs)
+	relatedJobs, err := models.FindJobsByRelatedBulk(c.Request().Context(), "email_accounts", accountIDs)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
@@ -320,7 +320,7 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 	}
 
 	// Fetch existing jobs
-	existingJobs, err := models.FindJobsByRelatedMany(ctx, "email_accounts", accountIDs)
+	existingJobs, err := models.FindJobsByRelatedBulk(ctx, "email_accounts", accountIDs)
 	if err != nil {
 		slog.Debug("Failed to find existing jobs", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
@@ -353,8 +353,8 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 					return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 				}
 
-				payload.Source = net.JoinHostPort(list.SourceHost, strconv.Itoa(list.SourcePort))
-				payload.Destination = net.JoinHostPort(list.DestinationHost, strconv.Itoa(list.DestinationPort))
+				payload.Source = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
+				payload.Destination = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
 
 				json, err := json.Marshal(payload)
 				if err != nil {
@@ -369,10 +369,12 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 		} else {
 			// Create new job
 			payload := jobs.MigrateAccount{
-				Source:            net.JoinHostPort(list.SourceHost, strconv.Itoa(list.SourcePort)),
-				Destination:       net.JoinHostPort(list.DestinationHost, strconv.Itoa(list.DestinationPort)),
-				Login:             account.Login,
-				Password:          account.Password,
+				Source:            net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
+				Destination:       net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
+				SrcUser:           account.SrcUser,
+				SrcPassword:       account.SrcPasswordHash,
+				DstUser:           account.DstUser,
+				DstPassword:       account.DstPasswordHash,
 				FolderLastUid:     make(map[string]uint32),
 				FolderUidValidity: make(map[string]uint32),
 			}
@@ -441,7 +443,7 @@ func SyncListJobMigrateStop(c *echo.Context) error {
 	}
 
 	// Fetch and cancel all running jobs
-	jobs, err := models.FindJobsByRelatedMany(ctx, "email_accounts", accountIDs)
+	jobs, err := models.FindJobsByRelatedBulk(ctx, "email_accounts", accountIDs)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}

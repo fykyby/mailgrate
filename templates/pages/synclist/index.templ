@@ -3,6 +3,7 @@ package synclist
 import (
 	"app/models"
 	"app/templates/components"
+	"app/templates/components/badge"
 	"app/templates/components/button"
 	"app/templates/components/dialog"
 	"app/templates/components/icon"
@@ -81,13 +82,17 @@ templ Index(props IndexProps) {
 							}
 						}
 						@table.Cell() {
-							{ list.SourceHost + ":" + strconv.Itoa(list.SourcePort) }
+							{ list.SrcHost + ":" + strconv.Itoa(list.SrcPort) }
 						}
 						@table.Cell() {
-							{ list.DestinationHost + ":" + strconv.Itoa(list.DestinationPort) }
+							{ list.DstHost + ":" + strconv.Itoa(list.DstPort) }
 						}
 						@table.Cell() {
-							{ cases.Title(language.Und).String(string(status)) }
+							@badge.Badge(badge.Props{
+								Variant: badge.VariantOutline,
+							}) {
+								{ cases.Title(language.Und).String(string(status)) }
+							}
 						}
 						@table.Cell(table.CellProps{
 							Class: "text-right",

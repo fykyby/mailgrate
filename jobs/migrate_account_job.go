@@ -5,6 +5,8 @@ import (
 	"app/helpers"
 	"app/models"
 	"context"
+	"crypto/tls"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -17,46 +19,77 @@ var MigrateAccountType models.JobType = "migrate_account"
 type MigrateAccount struct {
 	Source            string
 	Destination       string
-	Login             string
-	Password          string
+	SrcUser           string
+	SrcPassword       string
+	DstUser           string
+	DstPassword       string
 	FolderLastUid     map[string]uint32
 	FolderUidValidity map[string]uint32
 }
 
-func NewMigrateAccount(syncListID int, emailAccountID int, src string, dst string, login string, password string) *MigrateAccount {
+func NewMigrateAccount(syncListID int, emailAccountID int, src string, dst string, srcUser string, srcPassword string, dstUser string, dstPassword string) *MigrateAccount {
 	return &MigrateAccount{
 		Source:            src,
 		Destination:       dst,
-		Login:             login,
-		Password:          password,
+		SrcUser:           srcUser,
+		SrcPassword:       srcPassword,
+		DstUser:           dstUser,
+		DstPassword:       dstPassword,
 		FolderLastUid:     make(map[string]uint32),
 		FolderUidValidity: make(map[string]uint32),
 	}
 }
 
 func (j *MigrateAccount) Run(ctx context.Context) (err error) {
-	sourceClient, err := client.DialTLS(j.Source, nil)
+	sourceClient, err := client.Dial(j.Source)
 	if err != nil {
+		slog.Debug("Failed to connect to source server", "error", err)
 		return err
 	}
-	defer sourceClient.Close()
+	defer sourceClient.Logout()
 
-	destClient, err := client.DialTLS(j.Destination, nil)
+	err = sourceClient.StartTLS(&tls.Config{
+		InsecureSkipVerify: config.Config.IsDev,
+	})
 	if err != nil {
+		slog.Debug("Failed to start source TLS", "error", err)
 		return err
 	}
-	defer destClient.Close()
 
-	decryptedPassword, err := helpers.AesDecrypt(j.Password, config.Config.AppKey)
+	destClient, err := client.Dial(j.Destination)
 	if err != nil {
+		slog.Debug("Failed to connect to destination server", "error", err)
+		return err
+	}
+	defer destClient.Logout()
+
+	err = destClient.StartTLS(&tls.Config{
+		InsecureSkipVerify: config.Config.IsDev,
+	})
+	if err != nil {
+		slog.Debug("Failed to start destination TLS", "error", err)
 		return err
 	}
 
-	if err := sourceClient.Login(j.Login, decryptedPassword); err != nil {
+	decryptedSrcPassword, err := helpers.AesDecrypt(j.SrcPassword, config.Config.AppKey)
+	if err != nil {
+		slog.Debug("Failed to decrypt source password", "error", err)
 		return err
 	}
 
-	if err := destClient.Login(j.Login, decryptedPassword); err != nil {
+	decryptedDstPassword, err := helpers.AesDecrypt(j.DstPassword, config.Config.AppKey)
+	if err != nil {
+		slog.Debug("Failed to decrypt destination password", "error", err)
+		return err
+	}
+
+	if err := sourceClient.Login(j.SrcUser, decryptedSrcPassword); err != nil {
+		slog.Debug("Failed to login to source account", "error", err)
+		return err
+	}
+
+	if err := destClient.Login(j.DstUser, decryptedDstPassword); err != nil {
+		slog.Debug("Failed to login to destination account", "error", err)
 		return err
 	}
 
@@ -73,6 +106,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 
 	err = <-listFoldersDone
 	if err != nil {
+		slog.Debug("Failed to list folders", "error", err)
 		return err
 	}
 
@@ -85,6 +119,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 
 		srcFolder, err := sourceClient.Select(folderName, true)
 		if err != nil {
+			slog.Debug("Failed to select source folder", "folder", folderName, "error", err)
 			return err
 		}
 
@@ -95,9 +130,10 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 
 		criteria := imap.NewSearchCriteria()
 		criteria.Uid = &imap.SeqSet{}
-		criteria.Uid.AddRange(j.FolderLastUid[folderName], 4294967295)
+		criteria.Uid.AddRange(j.FolderLastUid[folderName]+1, 4294967295)
 		uids, err := sourceClient.Search(criteria)
 		if err != nil {
+			slog.Debug("Failed to search for messages", "folder", folderName, "error", err)
 			return err
 		}
 
@@ -107,6 +143,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 
 		if err := destClient.Create(folderName); err != nil {
 			if !strings.Contains(strings.ToUpper(err.Error()), "ALREADYEXISTS") && !strings.Contains(strings.ToUpper(err.Error()), "ALREADY EXISTS") {
+				slog.Debug("Failed to create destination folder", "folder", folderName, "error", err)
 				return err
 			}
 		}
@@ -132,7 +169,9 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			default:
 			}
 
-			if msg.Uid < j.FolderLastUid[folderName] {
+			slog.Debug("Fetched message", "uid", msg.Uid)
+
+			if msg.Uid <= j.FolderLastUid[folderName] {
 				continue
 			}
 
@@ -167,6 +206,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 		select {
 		case err := <-fetchMessagesDone:
 			if err != nil {
+				slog.Debug("Failed to fetch messages", "folder", folderName, "error", err)
 				return err
 			}
 		case <-ctx.Done():

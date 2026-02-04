@@ -179,7 +179,7 @@ func FindJobsByRelated(ctx context.Context, relatedTable string, relatedID int) 
 	return jobs, err
 }
 
-func FindJobsByRelatedMany(ctx context.Context, relatedTable string, relatedIDs []int) ([]*Job, error) {
+func FindJobsByRelatedBulk(ctx context.Context, relatedTable string, relatedIDs []int) ([]*Job, error) {
 	jobs := make([]*Job, 0)
 
 	err := db.Bun.
@@ -227,6 +227,60 @@ func UpdateJobs(ctx context.Context, jobs []*Job) error {
 		WherePK().
 		OmitZero().
 		Bulk().
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DeleteJob(ctx context.Context, id int) error {
+	_, err := db.Bun.
+		NewDelete().
+		Model(new(Job)).
+		Where("id = ?", id).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DeleteJobs(ctx context.Context, ids []int) error {
+	_, err := db.Bun.
+		NewDelete().
+		Model(new(Job)).
+		Where("id IN (?)", bun.In(ids)).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DeleteJobsByRelated(ctx context.Context, relatedTable string, relatedID int) error {
+	_, err := db.Bun.
+		NewDelete().
+		Model(new(Job)).
+		Where("related_table = ?", relatedTable).
+		Where("related_id = ?", relatedID).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DeleteJobsByRelatedBulk(ctx context.Context, relatedTable string, relatedIDs []int) error {
+	_, err := db.Bun.
+		NewDelete().
+		Model(new(Job)).
+		Where("related_table = ?", relatedTable).
+		Where("related_id IN (?)", bun.In(relatedIDs)).
 		Exec(ctx)
 	if err != nil {
 		return err

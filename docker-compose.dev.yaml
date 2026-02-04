@@ -34,7 +34,7 @@ services:
             - "8088:8080"
         environment:
             ADMINER_DEFAULT_SERVER: postgres
-    mail1:
+    mail:
         image: analogic/poste.io:latest
         ports:
             - "143:143" # IMAP
@@ -42,12 +42,12 @@ services:
             - "8090:80"
             - "8443:443" # WEB UI
         volumes:
-            - poste1-data:/data
+            - poste-data:/data
         environment:
-            VIRTUAL_HOST: mail1.local
-            LETSENCRYPT_HOST: mail1.local
+            VIRTUAL_HOST: localhost.localhost
+            LETSENCRYPT_HOST: localhost.localhost
 volumes:
     postgres-data:
         driver: local
-    poste1-data:
+    poste-data:
         driver: local

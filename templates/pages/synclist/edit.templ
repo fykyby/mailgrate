@@ -49,83 +49,83 @@ templ Edit(props EditProps) {
 				}
 				@form.Item() {
 					@form.Label(form.LabelProps{
-						For: "SourceHost",
+						For: "SrcHost",
 					}) {
 						Source Host
 					}
 					@input.Input(input.Props{
-						ID:       "SourceHost",
-						Name:     "SourceHost",
-						Value:    props.Values["SourceHost"],
-						HasError: props.Errors["SourceHost"] != "",
+						ID:       "SrcHost",
+						Name:     "SrcHost",
+						Value:    props.Values["SrcHost"],
+						HasError: props.Errors["SrcHost"] != "",
 					})
-					if props.Errors["SourceHost"] != "" {
+					if props.Errors["SrcHost"] != "" {
 						@form.Message(form.MessageProps{
 							Variant: form.MessageVariantError,
 						}) {
-							{ props.Errors["SourceHost"] }
+							{ props.Errors["SrcHost"] }
 						}
 					}
 				}
 				@form.Item() {
 					@form.Label(form.LabelProps{
-						For: "SourcePort",
+						For: "SrcPort",
 					}) {
 						Source Port
 					}
 					@input.Input(input.Props{
-						ID:       "SourcePort",
-						Name:     "SourcePort",
+						ID:       "SrcPort",
+						Name:     "SrcPort",
 						Type:     input.TypeNumber,
-						Value:    props.Values["SourcePort"],
-						HasError: props.Errors["SourcePort"] != "",
+						Value:    props.Values["SrcPort"],
+						HasError: props.Errors["SrcPort"] != "",
 					})
-					if props.Errors["SourcePort"] != "" {
+					if props.Errors["SrcPort"] != "" {
 						@form.Message(form.MessageProps{
 							Variant: form.MessageVariantError,
 						}) {
-							{ props.Errors["SourcePort"] }
+							{ props.Errors["SrcPort"] }
 						}
 					}
 				}
 				@form.Item() {
 					@form.Label(form.LabelProps{
-						For: "DestinationHost",
+						For: "DstHost",
 					}) {
 						Destination Host
 					}
 					@input.Input(input.Props{
-						ID:       "DestinationHost",
-						Name:     "DestinationHost",
-						Value:    props.Values["DestinationHost"],
-						HasError: props.Errors["DestinationHost"] != "",
+						ID:       "DstHost",
+						Name:     "DstHost",
+						Value:    props.Values["DstHost"],
+						HasError: props.Errors["DstHost"] != "",
 					})
-					if props.Errors["DestinationHost"] != "" {
+					if props.Errors["DstHost"] != "" {
 						@form.Message(form.MessageProps{
 							Variant: form.MessageVariantError,
 						}) {
-							{ props.Errors["DestinationHost"] }
+							{ props.Errors["DstHost"] }
 						}
 					}
 				}
 				@form.Item() {
 					@form.Label(form.LabelProps{
-						For: "DestinationPort",
+						For: "DstPort",
 					}) {
 						Destination Port
 					}
 					@input.Input(input.Props{
-						ID:       "DestinationPort",
-						Name:     "DestinationPort",
+						ID:       "DstPort",
+						Name:     "DstPort",
 						Type:     input.TypeNumber,
-						Value:    props.Values["DestinationPort"],
-						HasError: props.Errors["DestinationPort"] != "",
+						Value:    props.Values["DstPort"],
+						HasError: props.Errors["DstPort"] != "",
 					})
-					if props.Errors["DestinationPort"] != "" {
+					if props.Errors["DstPort"] != "" {
 						@form.Message(form.MessageProps{
 							Variant: form.MessageVariantError,
 						}) {
-							{ props.Errors["DestinationPort"] }
+							{ props.Errors["DstPort"] }
 						}
 					}
 				}

@@ -11,13 +11,13 @@ import (
 type SyncList struct {
 	bun.BaseModel `bun:"table:sync_lists"`
 
-	ID              int `bun:",pk,autoincrement"`
-	UserID          int
-	Name            string
-	SourceHost      string
-	SourcePort      int
-	DestinationHost string
-	DestinationPort int
+	ID      int `bun:",pk,autoincrement"`
+	UserID  int
+	Name    string
+	SrcHost string
+	SrcPort int
+	DstHost string
+	DstPort int
 }
 
 type SyncListsPaginated struct {
@@ -32,12 +32,12 @@ type SyncListStatus struct {
 
 func CreateSyncList(ctx context.Context, userID int, name string, sourceHost string, sourcePort int, destinationHost string, destinationPort int) (*SyncList, error) {
 	syncList := &SyncList{
-		UserID:          userID,
-		Name:            name,
-		SourceHost:      sourceHost,
-		SourcePort:      sourcePort,
-		DestinationHost: destinationHost,
-		DestinationPort: destinationPort,
+		UserID:  userID,
+		Name:    name,
+		SrcHost: sourceHost,
+		SrcPort: sourcePort,
+		DstHost: destinationHost,
+		DstPort: destinationPort,
 	}
 
 	_, err := db.Bun.
@@ -112,7 +112,16 @@ func UpdateSyncList(ctx context.Context, syncList *SyncList) error {
 }
 
 func DeleteSyncListByID(ctx context.Context, id int) error {
-	_, err := db.Bun.
+	accounts, err := FindEmailAccountsBySyncListID(ctx, id)
+	if err == nil {
+		accountIDs := make([]int, len(accounts))
+		for i, account := range accounts {
+			accountIDs[i] = account.ID
+		}
+		_ = DeleteJobsByRelatedBulk(ctx, "email_accounts", accountIDs)
+	}
+
+	_, err = db.Bun.
 		NewDelete().
 		Model(&SyncList{}).
 		Where("id = ?", id).

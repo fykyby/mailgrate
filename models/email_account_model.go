@@ -11,10 +11,12 @@ import (
 type EmailAccount struct {
 	bun.BaseModel `bun:"table:email_accounts"`
 
-	ID         int `bun:",pk,autoincrement"`
-	SyncListID int
-	Login      string
-	Password   string
+	ID              int `bun:",pk,autoincrement"`
+	SyncListID      int
+	SrcUser         string
+	SrcPasswordHash string
+	DstUser         string
+	DstPasswordHash string
 }
 
 type EmailAccountsPaginated struct {
@@ -22,11 +24,13 @@ type EmailAccountsPaginated struct {
 	Pagination    helpers.Pagination
 }
 
-func CreateEmailAccount(ctx context.Context, syncListID int, login string, password string) (*EmailAccount, error) {
+func CreateEmailAccount(ctx context.Context, syncListID int, srcUser string, srcPasswordHash string, dstUser string, dstPasswordHash string) (*EmailAccount, error) {
 	emailAccount := &EmailAccount{
-		SyncListID: syncListID,
-		Login:      login,
-		Password:   password,
+		SyncListID:      syncListID,
+		SrcUser:         srcUser,
+		SrcPasswordHash: srcPasswordHash,
+		DstUser:         dstUser,
+		DstPasswordHash: dstPasswordHash,
 	}
 
 	_, err := db.Bun.
@@ -64,7 +68,8 @@ func FindEmailAccountsBySyncListIDPaginated(ctx context.Context, syncListID int,
 		Where("sync_list_id = ?", syncListID).
 		Limit(helpers.PaginationLimit).
 		Offset((page-1)*helpers.PaginationLimit).
-		OrderBy("login", bun.OrderAsc).
+		OrderBy("src_user", bun.OrderAsc).
+		OrderBy("dst_user", bun.OrderAsc).
 		Scan(ctx)
 	if err != nil {
 		return nil, err
@@ -95,7 +100,8 @@ func FindEmailAccountsBySyncListID(ctx context.Context, syncListID int) ([]*Emai
 		Model(&emailAccounts).
 		Where("sync_list_id = ?", syncListID).
 		Limit(helpers.PaginationLimit).
-		OrderBy("login", bun.OrderAsc).
+		OrderBy("src_user", bun.OrderAsc).
+		OrderBy("dst_user", bun.OrderAsc).
 		Scan(ctx)
 	if err != nil {
 		return nil, err
@@ -115,6 +121,8 @@ func DeleteEmailAccount(ctx context.Context, id int) error {
 	if err != nil {
 		return err
 	}
+
+	_ = DeleteJobsByRelated(ctx, "email_accounts", id)
 
 	return nil
 }

@@ -7,6 +7,6 @@ import (
 
 func RegisterJobs() {
 	worker.RegisterJob(jobs.MigrateAccountType, func() worker.JobHandler {
-		return jobs.NewMigrateAccount(0, 0, "", "", "", "")
+		return jobs.NewMigrateAccount(0, 0, "", "", "", "", "", "")
 	})
 }

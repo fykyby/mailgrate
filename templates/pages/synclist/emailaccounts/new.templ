@@ -29,42 +29,83 @@ templ New(props NewProps) {
 			<form id="form" hx-post={ "/app/sync-lists/" + strconv.Itoa(props.List.ID) + "/email-accounts" } hx-swap="outerHTML">
 				@form.Item() {
 					@form.Label(form.LabelProps{
-						For: "Login",
+						For: "SrcUser",
 					}) {
-						Login
+						Source User
 					}
 					@input.Input(input.Props{
-						ID:       "Login",
-						Name:     "Login",
-						Value:    props.Values["Login"],
-						HasError: props.Errors["Login"] != "",
+						ID:       "SrcUser",
+						Name:     "SrcUser",
+						Value:    props.Values["SrcUser"],
+						HasError: props.Errors["SrcUser"] != "",
 					})
-					if props.Errors["Login"] != "" {
+					if props.Errors["SrcUser"] != "" {
 						@form.Message(form.MessageProps{
 							Variant: form.MessageVariantError,
 						}) {
-							{ props.Errors["Login"] }
+							{ props.Errors["SrcUser"] }
 						}
 					}
 				}
 				@form.Item() {
 					@form.Label(form.LabelProps{
-						For: "Password",
+						For: "SrcPassword",
 					}) {
-						Password
+						Source Password
 					}
 					@input.Input(input.Props{
-						ID:       "Password",
-						Name:     "Password",
+						ID:       "SrcPassword",
+						Name:     "SrcPassword",
 						Type:     input.TypePassword,
-						Value:    props.Values["Password"],
-						HasError: props.Errors["Password"] != "",
+						Value:    props.Values["SrcPassword"],
+						HasError: props.Errors["SrcPassword"] != "",
 					})
-					if props.Errors["Password"] != "" {
+					if props.Errors["SrcPassword"] != "" {
 						@form.Message(form.MessageProps{
 							Variant: form.MessageVariantError,
 						}) {
-							{ props.Errors["Password"] }
+							{ props.Errors["SrcPassword"] }
+						}
+					}
+				}
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "DstUser",
+					}) {
+						Destination User
+					}
+					@input.Input(input.Props{
+						ID:       "DstUser",
+						Name:     "DstUser",
+						Value:    props.Values["DstUser"],
+						HasError: props.Errors["DstUser"] != "",
+					})
+					if props.Errors["DstUser"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["DstUser"] }
+						}
+					}
+				}
+				@form.Item() {
+					@form.Label(form.LabelProps{
+						For: "DstPassword",
+					}) {
+						Destination Password
+					}
+					@input.Input(input.Props{
+						ID:       "DstPassword",
+						Name:     "DstPassword",
+						Type:     input.TypePassword,
+						Value:    props.Values["DstPassword"],
+						HasError: props.Errors["DstPassword"] != "",
+					})
+					if props.Errors["DstPassword"] != "" {
+						@form.Message(form.MessageProps{
+							Variant: form.MessageVariantError,
+						}) {
+							{ props.Errors["DstPassword"] }
 						}
 					}
 				}
