@@ -73,7 +73,7 @@ func UserSignUp(c *echo.Context) error {
 		}))
 	}
 
-	if !config.Config.IsDev {
+	if config.Config.RequireEmailConfirmation {
 		dialer := gomail.NewDialer(config.Config.SMTPHost, config.Config.SMTPPort, config.Config.SMTPLogin, config.Config.SMTPPassword)
 
 		message := gomail.NewMessage()
@@ -89,14 +89,16 @@ func UserSignUp(c *echo.Context) error {
 				Errors: helpers.FormatErrors(err),
 			}))
 		}
+
+		return helpers.Render(c, http.StatusOK, alert.Success(helpers.MsgSuccessUserCreated))
 	} else {
 		u.Confirmed = true
 		u.ConfirmationTokenHash = ""
 		u.ConfirmationExpiresAt = time.Time{}
 		_, err = models.UpdateUser(c.Request().Context(), u)
-	}
 
-	return helpers.Render(c, http.StatusOK, alert.Success(helpers.MsgSuccessUserCreated))
+		return helpers.Redirect(c, "/log-in")
+	}
 }
 
 func UserSignUpConfirm(c *echo.Context) error {
