@@ -6,8 +6,10 @@ import (
 	"app/models"
 	"context"
 	"crypto/tls"
+	"errors"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/emersion/go-imap"
@@ -56,34 +58,82 @@ func NewMigrateAccount(params NewMigrateAccountParams) *MigrateAccount {
 }
 
 func (j *MigrateAccount) Run(ctx context.Context) (err error) {
-	srcClient, err := client.Dial(j.SrcAddr)
-	if err != nil {
-		slog.Debug("Failed to connect to source server", "error", err)
-		return err
-	}
-	defer srcClient.Logout()
+	slog.Debug("Starting account migration")
 
-	err = srcClient.StartTLS(&tls.Config{
-		InsecureSkipVerify: config.Config.Debug,
-	})
-	if err != nil {
-		slog.Debug("Failed to start source TLS", "error", err)
-		return err
-	}
+	var srcClient *client.Client
+	var dstClient *client.Client
+	var dialWg sync.WaitGroup
+	var srcClientErr error
+	var dstClientErr error
 
-	dstClient, err := client.Dial(j.DstAddr)
-	if err != nil {
-		slog.Debug("Failed to connect to destination server", "error", err)
-		return err
-	}
-	defer dstClient.Logout()
+	dialWg.Add(2)
+	go func() {
+		defer dialWg.Done()
+		srcClient, srcClientErr = client.DialTLS(j.SrcAddr, nil)
+		if srcClient == nil && srcClientErr == nil {
+			srcClientErr = errors.New("source client is nil")
+		}
+	}()
+	go func() {
+		defer dialWg.Done()
+		dstClient, dstClientErr = client.DialTLS(j.DstAddr, nil)
+		if dstClient == nil && dstClientErr == nil {
+			dstClientErr = errors.New("destination client is nil")
+		}
+	}()
 
-	err = dstClient.StartTLS(&tls.Config{
-		InsecureSkipVerify: config.Config.Debug,
-	})
-	if err != nil {
-		slog.Debug("Failed to start destination TLS", "error", err)
-		return err
+	done := make(chan struct{})
+	go func() {
+		dialWg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		if srcClientErr != nil {
+			slog.Debug("Failed to connect to source server (TLS)", "error", srcClientErr)
+			srcClient, err = client.Dial(j.SrcAddr)
+			if err != nil {
+				slog.Debug("Failed to connect to source server (no TLS)", "error", err)
+				return err
+			}
+
+			err = srcClient.StartTLS(&tls.Config{
+				InsecureSkipVerify: config.Config.Debug,
+			})
+			if err != nil {
+				slog.Debug("Failed to start source TLS", "error", err)
+				return err
+			}
+		}
+
+		if dstClientErr != nil {
+			slog.Debug("Failed to connect to destination server (TLS)", "error", dstClientErr)
+			dstClient, err = client.Dial(j.DstAddr)
+			if err != nil {
+				slog.Debug("Failed to connect to destination server (no TLS)", "error", err)
+				return err
+			}
+
+			err = dstClient.StartTLS(&tls.Config{
+				InsecureSkipVerify: config.Config.Debug,
+			})
+			if err != nil {
+				slog.Debug("Failed to start destination TLS", "error", err)
+				return err
+			}
+		}
+
+		if srcClient != nil {
+			defer srcClient.Logout()
+		}
+		if dstClient != nil {
+			defer dstClient.Logout()
+		}
+
+		slog.Debug("Connected to source and destination servers")
+	case <-time.After(10 * time.Second):
+		return errors.New("dial timeout")
 	}
 
 	decryptedSrcPassword, err := helpers.AesDecrypt(j.SrcPassword, config.Config.AppKey)

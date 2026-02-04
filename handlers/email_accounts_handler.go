@@ -373,7 +373,7 @@ func EmailAccountJobMigrateStop(c *echo.Context) error {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.Id != userID || account.SyncListId != list.Id {
+	if list.UserId != userID || account.SyncListId != list.Id {
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
@@ -386,11 +386,19 @@ func EmailAccountJobMigrateStop(c *echo.Context) error {
 	}
 
 	if job == nil || !(job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending) {
+		slog.Debug("Job not found or not running")
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
+	}
+
+	job.Status = models.JobStatusInterrupted
+	err = models.UpdateJob(c.Request().Context(), job)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
 	runningJob := worker.GetRunningJob(job.Id)
 	if runningJob == nil {
+		slog.Debug("Running job not found")
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 

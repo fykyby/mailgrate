@@ -530,10 +530,17 @@ func SyncListJobMigrateStop(c *echo.Context) error {
 	}
 
 	for _, job := range jobs {
+		job.Status = models.JobStatusInterrupted
+
 		runningJob := worker.GetRunningJob(job.Id)
 		if runningJob != nil {
 			runningJob.Cancel()
 		}
+	}
+
+	err = models.UpdateJobs(ctx, jobs)
+	if err != nil {
+		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
 	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
