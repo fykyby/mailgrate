@@ -7,7 +7,7 @@ import (
 	"app/db"
 	"app/errorsx"
 	"app/helpers"
-	"app/templates/pages"
+	"app/templates/pages/base"
 	"context"
 	"log/slog"
 	"net/http"
@@ -44,11 +44,10 @@ func main() {
 	})
 
 	e.HTTPErrorHandler = func(c *echo.Context, err error) {
-		slog.Error(err.Error())
 		if errorsx.IsNotFoundError(err) {
-			helpers.Render(c, http.StatusNotFound, pages.Error(helpers.MsgErrNotFound))
+			helpers.Render(c, http.StatusNotFound, base.Error(helpers.MsgErrNotFound))
 		} else {
-			helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
+			helpers.Render(c, http.StatusInternalServerError, base.Error(helpers.MsgErrGeneric))
 		}
 	}
 

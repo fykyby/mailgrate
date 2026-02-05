@@ -20,11 +20,18 @@ type SyncList struct {
 	DstPort           int
 	CompareMessageIds bool
 	CompareLastUid    bool
+
+	Mailboxes []*Mailbox `bun:"rel:has-many,join:id=sync_list_id"`
 }
 
 type SyncListsPaginated struct {
 	SyncLists  []*SyncList
 	Pagination helpers.Pagination
+}
+
+type SyncListWithMailboxesPaginated struct {
+	SyncList          *SyncList
+	MailboxPagination helpers.Pagination
 }
 
 type SyncListStatus struct {
@@ -66,7 +73,7 @@ func CreateSyncList(ctx context.Context, params CreateSyncListParams) (*SyncList
 	return syncList, nil
 }
 
-func FindSyncListByID(ctx context.Context, id int) (*SyncList, error) {
+func FindSyncListById(ctx context.Context, id int) (*SyncList, error) {
 	var syncList SyncList
 
 	err := db.Bun.
@@ -81,7 +88,77 @@ func FindSyncListByID(ctx context.Context, id int) (*SyncList, error) {
 	return &syncList, nil
 }
 
-func FindSyncListsByUserIDPaginated(ctx context.Context, userId int, page int) (*SyncListsPaginated, error) {
+func FindSyncListByIdWithMailboxById(ctx context.Context, id int, mailboxId int) (*SyncList, error) {
+	var syncList SyncList
+
+	err := db.Bun.
+		NewSelect().
+		Model(&syncList).
+		Where("id = ?", id).
+		Relation("Mailboxes", func(sq *bun.SelectQuery) *bun.SelectQuery {
+			return sq.Where("id = ?", mailboxId)
+		}).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &syncList, nil
+}
+
+func FindSyncListByIdWithMailboxes(ctx context.Context, id int) (*SyncList, error) {
+	var syncList SyncList
+
+	err := db.Bun.
+		NewSelect().
+		Model(&syncList).
+		Where("id = ?", id).
+		Relation("Mailboxes").
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &syncList, nil
+}
+
+func FindSyncListByIdWithMailboxesPaginated(ctx context.Context, id int, page int) (*SyncListWithMailboxesPaginated, error) {
+	var syncList SyncList
+
+	err := db.Bun.
+		NewSelect().
+		Model(&syncList).
+		Where("id = ?", id).
+		Relation("Mailboxes", func(sq *bun.SelectQuery) *bun.SelectQuery {
+			return sq.
+				Limit(helpers.PaginationLimit).
+				Offset((page-1)*helpers.PaginationLimit).
+				OrderBy("src_user", bun.OrderAsc).
+				OrderBy("dst_user", bun.OrderAsc)
+		}).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	total, err := db.Bun.
+		NewSelect().
+		Model(&Mailbox{}).
+		Where("sync_list_id = ?", id).
+		Count(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	paginatedSyncList := &SyncListWithMailboxesPaginated{
+		SyncList:          &syncList,
+		MailboxPagination: helpers.NewPagination(page, total),
+	}
+
+	return paginatedSyncList, nil
+}
+
+func FindSyncListsByUserIdPaginated(ctx context.Context, userId int, page int) (*SyncListsPaginated, error) {
 	var syncLists []*SyncList
 
 	err := db.Bun.
@@ -126,14 +203,14 @@ func UpdateSyncList(ctx context.Context, syncList *SyncList) error {
 	return nil
 }
 
-func DeleteSyncListByID(ctx context.Context, id int) error {
-	accounts, err := FindEmailAccountsBySyncListID(ctx, id)
+func DeleteSyncListById(ctx context.Context, id int) error {
+	accounts, err := FindMailboxesBySyncListId(ctx, id)
 	if err == nil {
-		accountIDs := make([]int, len(accounts))
+		accountIds := make([]int, len(accounts))
 		for i, account := range accounts {
-			accountIDs[i] = account.Id
+			accountIds[i] = account.Id
 		}
-		_ = DeleteJobsByRelatedBulk(ctx, "email_accounts", accountIDs)
+		_ = DeleteJobsByManyRelated(ctx, "mailboxes", accountIds)
 	}
 
 	_, err = db.Bun.
@@ -176,8 +253,8 @@ func FindSyncListStatus(ctx context.Context, id int) (SyncListStatus, error) {
 			JobStatusNone,
 			JobStatusNone,
 		).
-		Join("LEFT JOIN email_accounts ea ON sl.id = ea.sync_list_id").
-		Join("LEFT JOIN jobs j ON ea.id = j.related_id AND j.related_table = ?", "email_accounts").
+		Join("LEFT JOIN mailboxes ea ON sl.id = ea.sync_list_id").
+		Join("LEFT JOIN jobs j ON ea.id = j.related_id AND j.related_table = ?", "mailboxes").
 		Where("sl.id = ?", id).
 		GroupExpr("sl.id").
 		Scan(ctx, &results)
@@ -213,8 +290,8 @@ func FindSyncListsStatus(ctx context.Context, ids []int) ([]SyncListStatus, erro
 			JobStatusNone,
 			JobStatusNone,
 		).
-		Join("LEFT JOIN email_accounts ea ON sl.id = ea.sync_list_id").
-		Join("LEFT JOIN jobs j ON ea.id = j.related_id AND j.related_table = ?", "email_accounts").
+		Join("LEFT JOIN mailboxes ea ON sl.id = ea.sync_list_id").
+		Join("LEFT JOIN jobs j ON ea.id = j.related_id AND j.related_table = ?", "mailboxes").
 		Where("sl.id IN (?)", bun.In(ids)).
 		GroupExpr("sl.id").
 		Scan(ctx, &results)

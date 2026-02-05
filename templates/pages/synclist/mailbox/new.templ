@@ -1,4 +1,4 @@
-package emailaccounts
+package mailbox
 
 import (
 	"app/models"
@@ -19,14 +19,14 @@ type NewProps struct {
 
 templ New(props NewProps) {
 	@layouts.App(layouts.AppProps{
-		Title: props.List.Name + " - Add Email Account",
+		Title: props.List.Name + " - Add mailbox",
 	}) {
 		@components.TitleBar(components.TitleBarProps{
-			Title:       "Add Email Account - " + props.List.Name,
+			Title:       "Add mailbox - " + props.List.Name,
 			PreviousURL: "/app/sync-lists/" + strconv.Itoa(props.List.Id),
 		})
 		@templ.Fragment("form") {
-			<form id="form" hx-post={ "/app/sync-lists/" + strconv.Itoa(props.List.Id) + "/email-accounts" } hx-swap="outerHTML">
+			<form id="form" hx-post={ "/app/sync-lists/" + strconv.Itoa(props.List.Id) + "/mailboxes" } hx-swap="outerHTML">
 				@form.Item() {
 					@form.Label(form.LabelProps{
 						For: "SrcUser",

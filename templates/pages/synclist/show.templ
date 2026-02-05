@@ -15,10 +15,10 @@ import (
 )
 
 type ShowProps struct {
-	SyncList               *models.SyncList
-	SyncListStatus         models.JobStatus
-	EmailAccountStatusMap  map[int]models.JobStatus
-	PaginatedEmailAccounts *models.EmailAccountsPaginated
+	SyncList           *models.SyncList
+	SyncListStatus     models.JobStatus
+	MailboxStatusMap   map[int]models.JobStatus
+	PaginatedMailboxes *models.MailboxesPaginated
 }
 
 templ Show(props ShowProps) {
@@ -34,44 +34,90 @@ templ Show(props ShowProps) {
 			PreviousURL: "/app/sync-lists",
 		})
 		@components.ActionBar() {
-			if len(props.PaginatedEmailAccounts.EmailAccounts) > 0 {
-				if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
-					@button.Button(button.Props{
-						ID: "toggle-sync-list-migration-button",
-						Attributes: templ.Attributes{
-							"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/migrate/start",
-							"hx-swap": "none",
-						},
-					}) {
-						Start
+			if len(props.PaginatedMailboxes.Mailboxes) > 0 {
+				@dialog.Dialog(dialog.Props{}) {
+					@dialog.Trigger() {
+						if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
+							@button.Button(button.Props{
+								ID: "toggle-sync-list-migration-dialog-button",
+							}) {
+								Start
+							}
+						} else if props.SyncListStatus == models.JobStatusRunning || props.SyncListStatus == models.JobStatusPending {
+							@button.Button(button.Props{
+								ID:      "toggle-sync-list-migration-dialog-button",
+								Variant: button.VariantDestructive,
+							}) {
+								Stop
+							}
+						}
 					}
-				} else if props.SyncListStatus == models.JobStatusRunning || props.SyncListStatus == models.JobStatusPending {
-					@button.Button(button.Props{
-						ID:      "toggle-sync-list-migration-button",
-						Variant: button.VariantDestructive,
-						Attributes: templ.Attributes{
-							"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/migrate/stop",
-							"hx-swap": "none",
-						},
+					@dialog.Content(dialog.ContentProps{
+						Class: "max-w-md",
 					}) {
-						Stop
+						@dialog.Header() {
+							@dialog.Title() {
+								Are you sure?
+							}
+							if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
+								@dialog.Description(dialog.DescriptionProps{
+									ID: "sync-list-migration-dialog-description",
+								}) {
+									This action will start migration for all Mailboxes for Sync List "{ props.SyncList.Name }".
+								}
+							} else {
+								@dialog.Description(dialog.DescriptionProps{
+									ID: "sync-list-migration-dialog-description",
+								}) {
+									This action will stop migration for all Mailboxes for Sync List "{ props.SyncList.Name }".
+								}
+							}
+						}
+						<div id={ "toggle-sync-list-migration-error" }></div>
+						@dialog.Footer() {
+							@dialog.Close() {
+								@button.Button(button.Props{
+									Variant: button.VariantOutline,
+								}) {
+									Cancel
+								}
+							}
+							if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
+								@button.Button(button.Props{
+									ID: "toggle-sync-list-migration-button",
+									Attributes: templ.Attributes{
+										"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/migrate/start",
+										"hx-swap": "none",
+									},
+								}) {
+									Start
+								}
+							} else if props.SyncListStatus == models.JobStatusRunning || props.SyncListStatus == models.JobStatusPending {
+								@button.Button(button.Props{
+									ID:      "toggle-sync-list-migration-button",
+									Variant: button.VariantDestructive,
+								}) {
+									Stop
+								}
+							}
+						}
 					}
 				}
 				@button.Button(button.Props{
-					ID:         "add-email-account-button",
+					ID:         "add-mailbox-button",
 					Variant:    button.VariantOutline,
-					Href:       "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/new",
+					Href:       "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/mailboxes/new",
 					Attributes: templ.Attributes{},
 				}) {
-					Add Email Account
+					Add Mailbox
 				}
 			} else {
 				@button.Button(button.Props{
-					ID:         "add-email-account-button",
-					Href:       "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/new",
+					ID:         "add-mailbox-button",
+					Href:       "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/mailboxes/new",
 					Attributes: templ.Attributes{},
 				}) {
-					Add Email Account
+					Add Mailbox
 				}
 			}
 			@button.Button(button.Props{
@@ -167,9 +213,9 @@ templ Show(props ShowProps) {
 				}
 			}
 			@table.Body() {
-				for _, account := range props.PaginatedEmailAccounts.EmailAccounts {
+				for _, account := range props.PaginatedMailboxes.Mailboxes {
 					{{
-						status, ok := props.EmailAccountStatusMap[account.Id]
+						status, ok := props.MailboxStatusMap[account.Id]
 						if !ok {
 							status = models.JobStatusNone
 						}
@@ -186,7 +232,7 @@ templ Show(props ShowProps) {
 						}
 						@table.Cell() {
 							@badge.Badge(badge.Props{
-								ID:      "email-account-" + strconv.Itoa(account.Id) + "-status-badge",
+								ID:      "mailbox-" + strconv.Itoa(account.Id) + "-status-badge",
 								Variant: badge.VariantOutline,
 							}) {
 								{ cases.Title(language.Und).String(string(status)) }
@@ -195,32 +241,82 @@ templ Show(props ShowProps) {
 						@table.Cell(table.CellProps{
 							Class: "text-right flex gap-2",
 						}) {
-							if status != models.JobStatusRunning && status != models.JobStatusPending {
-								@button.Button(button.Props{
-									ID:   "toggle-email-account-" + strconv.Itoa(account.Id) + "-migration-button",
-									Size: button.SizeIcon,
-									Attributes: templ.Attributes{
-										"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/" + strconv.Itoa(account.Id) + "/migrate/start",
-										"hx-swap": "none",
-									},
-								}) {
-									@icon.Play()
+							@dialog.Dialog(dialog.Props{}) {
+								@dialog.Trigger() {
+									if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
+										@button.Button(button.Props{
+											ID:   "toggle-mailbox-" + strconv.Itoa(account.Id) + "-migration-dialog-button",
+											Size: button.SizeIcon,
+										}) {
+											@icon.Play()
+										}
+									} else if props.SyncListStatus == models.JobStatusRunning || props.SyncListStatus == models.JobStatusPending {
+										@button.Button(button.Props{
+											ID:      "toggle-mailbox-" + strconv.Itoa(account.Id) + "-migration-dialog-button",
+											Size:    button.SizeIcon,
+											Variant: button.VariantDestructive,
+										}) {
+											@icon.Square()
+										}
+									}
 								}
-							} else if status == models.JobStatusRunning || status == models.JobStatusPending {
-								@button.Button(button.Props{
-									ID:      "toggle-email-account-" + strconv.Itoa(account.Id) + "-migration-button",
-									Variant: button.VariantDestructive,
-									Size:    button.SizeIcon,
-									Attributes: templ.Attributes{
-										"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/" + strconv.Itoa(account.Id) + "/migrate/stop",
-										"hx-swap": "none",
-									},
+								@dialog.Content(dialog.ContentProps{
+									Class: "max-w-md",
 								}) {
-									@icon.Square()
+									@dialog.Header() {
+										@dialog.Title() {
+											Are you sure?
+										}
+										if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
+											@dialog.Description(dialog.DescriptionProps{
+												ID: "mailbox-" + strconv.Itoa(account.Id) + "-migration-dialog-description",
+											}) {
+												This action will start migration for Mailbox "{ account.SrcUser } - { account.DstUser }".
+											}
+										} else {
+											@dialog.Description(dialog.DescriptionProps{
+												ID: "mailbox-" + strconv.Itoa(account.Id) + "-migration-dialog-description",
+											}) {
+												This action will stop migration for Mailbox "{ account.SrcUser } - { account.DstUser }".
+											}
+										}
+									}
+									<div id={ "toggle-mailbox-" + strconv.Itoa(account.Id) + "-migration-error" }></div>
+									@dialog.Footer() {
+										@dialog.Close() {
+											@button.Button(button.Props{
+												Variant: button.VariantOutline,
+											}) {
+												Cancel
+											}
+										}
+										if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
+											@button.Button(button.Props{
+												ID: "toggle-mailbox-" + strconv.Itoa(account.Id) + "-migration-button",
+												Attributes: templ.Attributes{
+													"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/mailboxes/" + strconv.Itoa(account.Id) + "/migrate/start",
+													"hx-swap": "none",
+												},
+											}) {
+												Start
+											}
+										} else if props.SyncListStatus == models.JobStatusRunning || props.SyncListStatus == models.JobStatusPending {
+											@button.Button(button.Props{
+												ID:      "toggle-mailbox-" + strconv.Itoa(account.Id) + "-migration-button",
+												Variant: button.VariantDestructive,
+												Attributes: templ.Attributes{
+													"hx-post": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/mailboxes/" + strconv.Itoa(account.Id) + "/migrate/stop",
+													"hx-swap": "none",
+												},
+											}) {
+												Stop
+											}
+										}
+									}
 								}
 							}
 							@dialog.Dialog(dialog.Props{
-								ID: "delete-email-account-" + strconv.Itoa(account.Id),
+								ID: "delete-mailbox-" + strconv.Itoa(account.Id),
 							}) {
 								@dialog.Trigger() {
 									@button.Button(button.Props{
@@ -241,7 +337,7 @@ templ Show(props ShowProps) {
 											This action will permanently delete "{ account.SrcUser } - { account.DstUser }" from "{ props.SyncList.Name }".
 										}
 									}
-									<div id={ "delete-email-account-" + strconv.Itoa(account.Id) + "-error" }></div>
+									<div id={ "delete-mailbox-" + strconv.Itoa(account.Id) + "-error" }></div>
 									@dialog.Footer() {
 										@dialog.Close() {
 											@button.Button(button.Props{
@@ -253,8 +349,8 @@ templ Show(props ShowProps) {
 										@button.Button(button.Props{
 											Variant: button.VariantDestructive,
 											Attributes: templ.Attributes{
-												"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/" + strconv.Itoa(account.Id) + "/migrate",
-												"hx-target": "#delete-email-account-" + strconv.Itoa(account.Id) + "-error",
+												"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/mailboxes/" + strconv.Itoa(account.Id) + "/migrate",
+												"hx-target": "#delete-mailbox-" + strconv.Itoa(account.Id) + "-error",
 												"hx-swap":   "outerHTML",
 											},
 										}) {
@@ -263,8 +359,8 @@ templ Show(props ShowProps) {
 										@button.Button(button.Props{
 											Variant: button.VariantDestructive,
 											Attributes: templ.Attributes{
-												"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/" + strconv.Itoa(account.Id),
-												"hx-target": "#delete-email-account-" + strconv.Itoa(account.Id) + "-error",
+												"hx-delete": "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/mailboxes/" + strconv.Itoa(account.Id),
+												"hx-target": "#delete-mailbox-" + strconv.Itoa(account.Id) + "-error",
 												"hx-swap":   "outerHTML",
 											},
 										}) {
@@ -278,6 +374,6 @@ templ Show(props ShowProps) {
 				}
 			}
 		}
-		@components.AppPagination(props.PaginatedEmailAccounts.Pagination)
+		@components.AppPagination(props.PaginatedMailboxes.Pagination)
 	}
 }

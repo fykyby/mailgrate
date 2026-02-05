@@ -3,7 +3,7 @@ package app
 import (
 	"app/handlers"
 	"app/helpers"
-	"app/templates/pages"
+	"app/templates/pages/base"
 	"net/http"
 
 	middlewarex "app/middleware"
@@ -15,7 +15,7 @@ func RegisterRoutes(e *echo.Echo) {
 	aa := e.Group("")
 	aa.Use(middlewarex.WithAuthAny)
 	aa.GET("/", func(c *echo.Context) error {
-		return helpers.Render(c, http.StatusOK, pages.Home())
+		return helpers.Render(c, http.StatusOK, base.Home())
 	})
 	aa.GET("/password-reset", handlers.UserShowRequestPasswordReset)
 	aa.POST("/password-reset", handlers.UserRequestPasswordReset)
@@ -45,14 +45,14 @@ func RegisterRoutes(e *echo.Echo) {
 	ar.PUT("/app/sync-lists/:id", handlers.SyncListUpdate)
 	ar.DELETE("/app/sync-lists/:id", handlers.SyncListDelete)
 
-	ar.GET("/app/sync-lists/:id/email-accounts/new", handlers.EmailAccountNew)
-	ar.POST("/app/sync-lists/:id/email-accounts", handlers.EmailAccountCreate)
-	ar.DELETE("/app/sync-lists/:listID/email-accounts/:id", handlers.EmailAccountDelete)
+	ar.GET("/app/sync-lists/:id/mailboxes/new", handlers.MailboxNew)
+	ar.POST("/app/sync-lists/:id/mailboxes", handlers.MailboxCreate)
+	ar.DELETE("/app/sync-lists/:listId/mailboxes/:id", handlers.MailboxDelete)
 
 	ar.POST("/app/sync-lists/:id/migrate/start", handlers.SyncListJobMigrateStart)
 	ar.POST("/app/sync-lists/:id/migrate/stop", handlers.SyncListJobMigrateStop)
 	ar.DELETE("/app/sync-lists/:id/migrate", handlers.SyncListDeleteJobs)
-	ar.POST("/app/sync-lists/:listID/email-accounts/:id/migrate/start", handlers.EmailAccountJobMigrateStart)
-	ar.POST("/app/sync-lists/:listID/email-accounts/:id/migrate/stop", handlers.EmailAccountJobMigrateStop)
-	ar.DELETE("/app/sync-lists/:listID/email-accounts/:id/migrate", handlers.EmailAccountDeleteJob)
+	ar.POST("/app/sync-lists/:listId/mailboxes/:id/migrate/start", handlers.MailboxJobMigrateStart)
+	ar.POST("/app/sync-lists/:listId/mailboxes/:id/migrate/stop", handlers.MailboxJobMigrateStop)
+	ar.DELETE("/app/sync-lists/:listId/mailboxes/:id/migrate", handlers.MailboxDeleteJob)
 }

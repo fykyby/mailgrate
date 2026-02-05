@@ -4,6 +4,7 @@ import (
 	"app/models"
 	"app/templates/components/badge"
 	"app/templates/components/button"
+	"app/templates/components/dialog"
 	"app/templates/components/icon"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -11,7 +12,7 @@ import (
 )
 
 templ PartShowOOB(props ShowProps) {
-	if len(props.PaginatedEmailAccounts.EmailAccounts) > 0 {
+	if len(props.PaginatedMailboxes.Mailboxes) > 0 {
 		if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
 			@button.Button(button.Props{
 				ID: "toggle-sync-list-migration-button",
@@ -37,24 +38,63 @@ templ PartShowOOB(props ShowProps) {
 			}
 		}
 		@button.Button(button.Props{
-			ID:      "add-email-account-button",
+			ID:      "add-mailbox-button",
 			Variant: button.VariantOutline,
-			Href:    "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/new",
+			Href:    "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/mailboxes/new",
 			Attributes: templ.Attributes{
 				"hx-swap-oob": "true",
 			},
 		}) {
-			Add Email Account
+			Add Mailbox
 		}
 	} else {
 		@button.Button(button.Props{
-			ID:   "add-email-account-button",
-			Href: "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/new",
+			ID:   "add-mailbox-button",
+			Href: "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/mailboxes/new",
 			Attributes: templ.Attributes{
 				"hx-swap-oob": "true",
 			},
 		}) {
-			Add Email Account
+			Add Mailbox
+		}
+	}
+	if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
+		@button.Button(button.Props{
+			ID: "toggle-sync-list-migration-dialog-button",
+			Attributes: templ.Attributes{
+				"hx-swap-oob": "true",
+			},
+		}) {
+			Start
+		}
+	} else if props.SyncListStatus == models.JobStatusRunning || props.SyncListStatus == models.JobStatusPending {
+		@button.Button(button.Props{
+			ID:      "toggle-sync-list-migration-dialog-button",
+			Variant: button.VariantDestructive,
+			Attributes: templ.Attributes{
+				"hx-swap-oob": "true",
+			},
+		}) {
+			Stop
+		}
+	}
+	if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
+		@dialog.Description(dialog.DescriptionProps{
+			ID: "sync-list-migration-dialog-description",
+			Attributes: templ.Attributes{
+				"hx-swap-oob": "true",
+			},
+		}) {
+			This action will start migration for all Mailboxes for Sync List "{ props.SyncList.Name }".
+		}
+	} else {
+		@dialog.Description(dialog.DescriptionProps{
+			ID: "sync-list-migration-dialog-description",
+			Attributes: templ.Attributes{
+				"hx-swap-oob": "true",
+			},
+		}) {
+			This action will stop migration for all Mailboxes for Sync List "{ props.SyncList.Name }".
 		}
 	}
 	@badge.Badge(badge.Props{
@@ -66,16 +106,16 @@ templ PartShowOOB(props ShowProps) {
 	}) {
 		Status: { cases.Title(language.Und).String(string(props.SyncListStatus)) }
 	}
-	for _, account := range props.PaginatedEmailAccounts.EmailAccounts {
+	for _, account := range props.PaginatedMailboxes.Mailboxes {
 		{{
-			status, ok := props.EmailAccountStatusMap[account.Id]
+			status, ok := props.MailboxStatusMap[account.Id]
 			if !ok {
 				status = models.JobStatusNone
 			}
 		}}
-		// Email account status badge
+		// mailbox status badge
 		@badge.Badge(badge.Props{
-			ID:      "email-account-" + strconv.Itoa(account.Id) + "-status-badge",
+			ID:      "mailbox-" + strconv.Itoa(account.Id) + "-status-badge",
 			Variant: badge.VariantOutline,
 			Attributes: templ.Attributes{
 				"hx-swap-oob": "true",
@@ -83,31 +123,72 @@ templ PartShowOOB(props ShowProps) {
 		}) {
 			{ cases.Title(language.Und).String(string(status)) }
 		}
-		// Toggle email account migration button
-		if status != models.JobStatusRunning && status != models.JobStatusPending {
+		// Toggle mailbox migration dialog button
+		if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
 			@button.Button(button.Props{
-				ID:   "toggle-email-account-" + strconv.Itoa(account.Id) + "-migration-button",
+				ID:   "toggle-mailbox-" + strconv.Itoa(account.Id) + "-migration-dialog-button",
 				Size: button.SizeIcon,
 				Attributes: templ.Attributes{
-					"hx-post":     "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/" + strconv.Itoa(account.Id) + "/migrate/start",
-					"hx-swap":     "none",
 					"hx-swap-oob": "true",
 				},
 			}) {
 				@icon.Play()
 			}
-		} else if status == models.JobStatusRunning || status == models.JobStatusPending {
+		} else if props.SyncListStatus == models.JobStatusRunning || props.SyncListStatus == models.JobStatusPending {
 			@button.Button(button.Props{
-				ID:      "toggle-email-account-" + strconv.Itoa(account.Id) + "-migration-button",
-				Variant: button.VariantDestructive,
+				ID:      "toggle-mailbox-" + strconv.Itoa(account.Id) + "-migration-dialog-button",
 				Size:    button.SizeIcon,
+				Variant: button.VariantDestructive,
 				Attributes: templ.Attributes{
-					"hx-post":     "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/email-accounts/" + strconv.Itoa(account.Id) + "/migrate/stop",
-					"hx-swap":     "none",
 					"hx-swap-oob": "true",
 				},
 			}) {
 				@icon.Square()
+			}
+		}
+		// Toggle mailbox dialog description
+		if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
+			@dialog.Description(dialog.DescriptionProps{
+				ID: "mailbox-" + strconv.Itoa(account.Id) + "-migration-dialog-description",
+				Attributes: templ.Attributes{
+					"hx-swap-oob": "true",
+				},
+			}) {
+				This action will start migration for Mailbox "{ account.SrcUser } - { account.DstUser }".
+			}
+		} else {
+			@dialog.Description(dialog.DescriptionProps{
+				ID: "mailbox-" + strconv.Itoa(account.Id) + "-migration-dialog-description",
+				Attributes: templ.Attributes{
+					"hx-swap-oob": "true",
+				},
+			}) {
+				This action will stop migration for Mailbox "{ account.SrcUser } - { account.DstUser }".
+			}
+		}
+		// Toggle mailbox migration button
+		if props.SyncListStatus != models.JobStatusRunning && props.SyncListStatus != models.JobStatusPending {
+			@button.Button(button.Props{
+				ID: "toggle-mailbox-" + strconv.Itoa(account.Id) + "-migration-button",
+				Attributes: templ.Attributes{
+					"hx-post":     "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/mailboxes/" + strconv.Itoa(account.Id) + "/migrate/start",
+					"hx-swap":     "none",
+					"hx-swap-oob": "true",
+				},
+			}) {
+				Start
+			}
+		} else if props.SyncListStatus == models.JobStatusRunning || props.SyncListStatus == models.JobStatusPending {
+			@button.Button(button.Props{
+				ID:      "toggle-mailbox-" + strconv.Itoa(account.Id) + "-migration-button",
+				Variant: button.VariantDestructive,
+				Attributes: templ.Attributes{
+					"hx-post":     "/app/sync-lists/" + strconv.Itoa(props.SyncList.Id) + "/mailboxes/" + strconv.Itoa(account.Id) + "/migrate/stop",
+					"hx-swap":     "none",
+					"hx-swap-oob": "true",
+				},
+			}) {
+				Stop
 			}
 		}
 	}

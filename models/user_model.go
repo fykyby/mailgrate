@@ -15,11 +15,11 @@ type User struct {
 	Email                  string
 	PasswordHash           string
 	Confirmed              bool
-	ConfirmationTokenHash  string    `bun:",nullzero,default:null"`
-	ConfirmationExpiresAt  time.Time `bun:",nullzero,default:null"`
-	PasswordResetTokenHash string    `bun:",nullzero,default:null"`
-	PasswordResetExpiresAt time.Time `bun:",nullzero,default:null"`
-	CreatedAt              time.Time `bun:",nullzero,default:current_timestamp"`
+	ConfirmationTokenHash  *string    `bun:",nullzero,default:null"`
+	ConfirmationExpiresAt  *time.Time `bun:",nullzero,default:null"`
+	PasswordResetTokenHash *string    `bun:",nullzero,default:null"`
+	PasswordResetExpiresAt *time.Time `bun:",nullzero,default:null"`
+	CreatedAt              time.Time  `bun:",default:current_timestamp"`
 }
 
 func CreateUser(ctx context.Context, email string, passwordHash string, confirmationTokenHash string, confirmationExpiresAt time.Time) (*User, error) {
@@ -27,10 +27,11 @@ func CreateUser(ctx context.Context, email string, passwordHash string, confirma
 		Email:                  email,
 		PasswordHash:           passwordHash,
 		Confirmed:              false,
-		ConfirmationTokenHash:  confirmationTokenHash,
-		ConfirmationExpiresAt:  confirmationExpiresAt,
-		PasswordResetTokenHash: "",
-		PasswordResetExpiresAt: time.Time{},
+		ConfirmationTokenHash:  &confirmationTokenHash,
+		ConfirmationExpiresAt:  &confirmationExpiresAt,
+		PasswordResetTokenHash: nil,
+		PasswordResetExpiresAt: nil,
+		CreatedAt:              time.Now(),
 	}
 
 	_, err := db.Bun.
@@ -44,7 +45,7 @@ func CreateUser(ctx context.Context, email string, passwordHash string, confirma
 	return user, nil
 }
 
-func FindUserByID(ctx context.Context, id int) (*User, error) {
+func FindUserById(ctx context.Context, id int) (*User, error) {
 	user := new(User)
 
 	err := db.Bun.

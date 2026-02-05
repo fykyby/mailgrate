@@ -11,16 +11,19 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-const sessionKey = "session"
 const userSessionKey = "user"
 const TemplContextSessionKey = "session"
 
 type UserSessionData struct {
-	ID    int
+	Id    int
 	Email string
 }
 
 var SessionStore *pgstore.PGStore
+
+func GetSessionKey() string {
+	return "session_" + config.Config.AppName
+}
 
 func InitPostgresSessionStore() {
 	store, err := pgstore.NewPGStore(config.Config.DatabaseURL, []byte(config.Config.AppKey))
@@ -42,7 +45,7 @@ func InitPostgresSessionStore() {
 }
 
 func GetUserSessionData(c *echo.Context) *UserSessionData {
-	sess, err := session.Get(sessionKey, c)
+	sess, err := session.Get(GetSessionKey(), c)
 	if err != nil {
 		return nil
 	}
@@ -61,7 +64,7 @@ func GetUserSessionData(c *echo.Context) *UserSessionData {
 }
 
 func SetUserSessionData(c *echo.Context, userData *UserSessionData) error {
-	sess, err := session.Get(sessionKey, c)
+	sess, err := session.Get(GetSessionKey(), c)
 	if err != nil {
 		return err
 	}
@@ -77,7 +80,7 @@ func SetUserSessionData(c *echo.Context, userData *UserSessionData) error {
 }
 
 func ClearUserSessionData(c *echo.Context) error {
-	sess, err := session.Get(sessionKey, c)
+	sess, err := session.Get(GetSessionKey(), c)
 	if err != nil {
 		return err
 	}

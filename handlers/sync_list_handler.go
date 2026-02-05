@@ -6,15 +6,14 @@ import (
 	"app/jobs"
 	"app/models"
 	"app/templates/components/alert"
-	"app/templates/pages"
+	"app/templates/pages/base"
 	"app/templates/pages/synclist"
 	"app/worker"
 	"encoding/json"
-	"log"
 	"log/slog"
-	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v5"
 )
@@ -23,24 +22,24 @@ func SyncListIndex(c *echo.Context) error {
 	page, err := helpers.QueryParamAsInt(c, "page")
 	if err != nil {
 		slog.Error("Error parsing page parameter", "error", err)
-		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
+		return helpers.Render(c, http.StatusInternalServerError, base.Error(helpers.MsgErrGeneric))
 	}
 
-	syncLists, err := models.FindSyncListsByUserIDPaginated(c.Request().Context(), helpers.GetUserSessionData(c).ID, page)
+	syncLists, err := models.FindSyncListsByUserIdPaginated(c.Request().Context(), helpers.GetUserSessionData(c).Id, page)
 	if err != nil {
 		slog.Error("Error finding sync lists", "error", err)
-		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
+		return helpers.Render(c, http.StatusInternalServerError, base.Error(helpers.MsgErrGeneric))
 	}
 
-	listIDs := make([]int, len(syncLists.SyncLists))
+	listIds := make([]int, len(syncLists.SyncLists))
 	for i, list := range syncLists.SyncLists {
-		listIDs[i] = list.Id
+		listIds[i] = list.Id
 	}
 
-	statuses, err := models.FindSyncListsStatus(c.Request().Context(), listIDs)
+	statuses, err := models.FindSyncListsStatus(c.Request().Context(), listIds)
 	if err != nil {
 		slog.Error("Error finding sync list statuses", "error", err)
-		return helpers.Render(c, http.StatusInternalServerError, pages.Error(helpers.MsgErrGeneric))
+		return helpers.Render(c, http.StatusInternalServerError, base.Error(helpers.MsgErrGeneric))
 	}
 
 	jobStatusMap := make(map[int]models.JobStatus)
@@ -78,7 +77,7 @@ func SyncListCreate(c *echo.Context) error {
 	}
 
 	list, err := models.CreateSyncList(c.Request().Context(), models.CreateSyncListParams{
-		UserId:            helpers.GetUserSessionData(c).ID,
+		UserId:            helpers.GetUserSessionData(c).Id,
 		Name:              req.Name,
 		SrcHost:           req.SrcHost,
 		SrcPort:           req.SrcPort,
@@ -88,6 +87,7 @@ func SyncListCreate(c *echo.Context) error {
 		CompareLastUid:    req.CompareLastUid,
 	})
 	if err != nil {
+		slog.Error("failed to create sync list", "err", err)
 		return helpers.RenderFragment(c, http.StatusInternalServerError, "form", synclist.New(synclist.NewProps{
 			Values: helpers.FormatValues(c),
 			Errors: helpers.FormatErrors(err),
@@ -100,86 +100,87 @@ func SyncListCreate(c *echo.Context) error {
 func SyncListShow(c *echo.Context) error {
 	id, err := helpers.ParamAsInt(c, "id")
 	if err != nil {
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		slog.Error("failed to parse sync list ID", "err", err)
+		return helpers.Render(c, http.StatusInternalServerError, base.Error(helpers.MsgErrGeneric))
 	}
 
 	page, err := helpers.QueryParamAsInt(c, "page")
 	if err != nil {
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		slog.Error("failed to parse page parameter", "err", err)
+		return helpers.Render(c, http.StatusInternalServerError, base.Error(helpers.MsgErrGeneric))
 	}
 
-	list, err := models.FindSyncListByID(c.Request().Context(), id)
+	listPaginated, err := models.FindSyncListByIdWithMailboxesPaginated(c.Request().Context(), id, page)
 	if err != nil {
-		if errorsx.IsNotFoundError(err) {
-			return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
-		}
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		slog.Error("failed to find sync list", "err", err)
+		return helpers.Render(c, http.StatusInternalServerError, base.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserId != helpers.GetUserSessionData(c).ID {
-		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
+	mailboxIds := make([]int, len(listPaginated.SyncList.Mailboxes))
+	for i, mailbox := range listPaginated.SyncList.Mailboxes {
+		mailboxIds[i] = mailbox.Id
 	}
 
-	accounts, err := models.FindEmailAccountsBySyncListIDPaginated(c.Request().Context(), list.Id, page)
+	jobs, err := models.FindJobsByManyRelated(c.Request().Context(), "mailboxes", mailboxIds)
 	if err != nil {
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		slog.Error("failed to find jobs", "err", err)
+		return helpers.Render(c, http.StatusInternalServerError, base.Error(helpers.MsgErrGeneric))
 	}
 
-	accountIDs := make([]int, len(accounts.EmailAccounts))
-	for i, account := range accounts.EmailAccounts {
-		accountIDs[i] = account.Id
-	}
-
-	jobs, err := models.FindJobsByRelatedBulk(c.Request().Context(), "email_accounts", accountIDs)
-	if err != nil {
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
-	}
-
-	accountStatusMap := make(map[int]models.JobStatus)
+	mailboxestatusMap := make(map[int]models.JobStatus)
 	for _, job := range jobs {
-		accountStatusMap[job.RelatedId] = job.Status
+		mailboxestatusMap[*job.RelatedId] = job.Status
 	}
 
-	listStatus, err := models.FindSyncListStatus(c.Request().Context(), list.Id)
+	listStatus, err := models.FindSyncListStatus(c.Request().Context(), listPaginated.SyncList.Id)
 	if err != nil {
-		log.Println(err)
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		slog.Error("failed to find sync list status", "err", err)
+		return helpers.Render(c, http.StatusInternalServerError, base.Error(helpers.MsgErrGeneric))
 	}
 
 	if c.QueryParam("polling") == "true" {
 		helpers.Reswap(c, "none")
 		return helpers.Render(c, http.StatusOK, synclist.PartShowOOB(synclist.ShowProps{
-			SyncList:               list,
-			SyncListStatus:         listStatus.Status,
-			EmailAccountStatusMap:  accountStatusMap,
-			PaginatedEmailAccounts: accounts,
+			SyncList:         listPaginated.SyncList,
+			SyncListStatus:   listStatus.Status,
+			MailboxStatusMap: mailboxestatusMap,
+			PaginatedMailboxes: &models.MailboxesPaginated{
+				Mailboxes:  listPaginated.SyncList.Mailboxes,
+				Pagination: listPaginated.MailboxPagination,
+			},
 		}))
 	}
 
 	return helpers.Render(c, http.StatusOK, synclist.Show(synclist.ShowProps{
-		SyncList:               list,
-		SyncListStatus:         listStatus.Status,
-		EmailAccountStatusMap:  accountStatusMap,
-		PaginatedEmailAccounts: accounts,
+		SyncList:         listPaginated.SyncList,
+		SyncListStatus:   listStatus.Status,
+		MailboxStatusMap: mailboxestatusMap,
+		PaginatedMailboxes: &models.MailboxesPaginated{
+			Mailboxes:  listPaginated.SyncList.Mailboxes,
+			Pagination: listPaginated.MailboxPagination,
+		},
 	}))
 }
 
 func SyncListEdit(c *echo.Context) error {
 	id, err := helpers.ParamAsInt(c, "id")
 	if err != nil {
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		slog.Error("failed to parse sync list id", "err", err)
+		return helpers.Render(c, http.StatusInternalServerError, base.Error(helpers.MsgErrGeneric))
 	}
 
-	list, err := models.FindSyncListByID(c.Request().Context(), id)
+	list, err := models.FindSyncListById(c.Request().Context(), id)
 	if err != nil {
 		if errorsx.IsNotFoundError(err) {
-			return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
+			return helpers.Render(c, http.StatusNotFound, base.Error(helpers.MsgErrNotFound))
 		}
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+
+		slog.Error("failed to find sync list", "err", err)
+		return helpers.Render(c, http.StatusInternalServerError, base.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserId != helpers.GetUserSessionData(c).ID {
-		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
+	if list.UserId != helpers.GetUserSessionData(c).Id {
+		return helpers.Render(c, http.StatusForbidden, base.Error(helpers.MsgErrForbidden))
 	}
 
 	return helpers.Render(c, http.StatusOK, synclist.Edit(synclist.EditProps{
@@ -201,67 +202,51 @@ func SyncListUpdate(c *echo.Context) error {
 
 	id, err := helpers.ParamAsInt(c, "id")
 	if err != nil {
+		slog.Error("failed to parse sync list id", "err", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	list, err := models.FindSyncListByID(c.Request().Context(), id)
+	list, err := models.FindSyncListByIdWithMailboxes(c.Request().Context(), id)
 	if err != nil {
 		if errorsx.IsNotFoundError(err) {
 			return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
 		}
+
+		slog.Error("failed to find sync list", "err", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	err = helpers.BindAndValidate(c, &req)
-	if err != nil {
-		return helpers.RenderFragment(c, http.StatusBadRequest, "form", synclist.Edit(synclist.EditProps{
-			List:   list,
-			Values: helpers.FormatValues(c),
-			Errors: helpers.FormatErrors(err),
-		}))
-	}
-
-	if list.UserId != helpers.GetUserSessionData(c).ID {
+	if list.UserId != helpers.GetUserSessionData(c).Id {
+		slog.Error("failed to validate sync list", "err", err)
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	accounts, err := models.FindEmailAccountsBySyncListID(c.Request().Context(), list.Id)
-	if err != nil {
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	mailboxIds := make([]int, len(list.Mailboxes))
+	for i, mailbox := range list.Mailboxes {
+		mailboxIds[i] = mailbox.Id
 	}
 
-	accountIDs := make([]int, len(accounts))
-	for i, account := range accounts {
-		accountIDs[i] = account.Id
-	}
-
-	relatedJobs, err := models.FindJobsByRelatedBulk(c.Request().Context(), "email_accounts", accountIDs)
+	relatedJobs, err := models.FindJobsByManyRelated(c.Request().Context(), "mailboxes", mailboxIds)
 	if err != nil {
+		slog.Error("failed to find jobs by many related", "err", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
 	for _, job := range relatedJobs {
 		if job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending {
+			slog.Error("failed to validate sync list", "err", "job is running or pending")
 			return helpers.Render(c, http.StatusConflict, alert.Error(helpers.MsgErrForbidden))
 		}
+	}
 
-		payload := new(jobs.MigrateAccount)
-		err = json.Unmarshal(job.Payload, payload)
-		if err != nil {
-			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
-		}
-
-		payload.SrcAddr = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
-		payload.DstAddr = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
-		payload.CompareMessageIds = req.CompareMessageIds
-		payload.CompareLastUid = req.CompareLastUid
-
-		json, err := json.Marshal(payload)
-		if err != nil {
-			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
-		}
-
-		job.Payload = json
+	err = helpers.BindAndValidate(c, &req)
+	if err != nil {
+		slog.Error("failed to bind and validate sync list", "err", err)
+		return helpers.RenderFragment(c, http.StatusBadRequest, "form", synclist.Edit(synclist.EditProps{
+			List:   list,
+			Values: helpers.FormatValues(c),
+			Errors: helpers.FormatErrors(err),
+		}))
 	}
 
 	list.Name = req.Name
@@ -274,14 +259,8 @@ func SyncListUpdate(c *echo.Context) error {
 
 	err = models.UpdateSyncList(c.Request().Context(), list)
 	if err != nil {
+		slog.Error("failed to update sync list", "err", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
-	}
-
-	if len(relatedJobs) > 0 {
-		err = models.UpdateJobs(c.Request().Context(), relatedJobs)
-		if err != nil {
-			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
-		}
 	}
 
 	return helpers.Redirect(c, "/app/sync-lists/"+strconv.Itoa(list.Id))
@@ -290,44 +269,46 @@ func SyncListUpdate(c *echo.Context) error {
 func SyncListDelete(c *echo.Context) error {
 	id, err := helpers.ParamAsInt(c, "id")
 	if err != nil {
+		slog.Error("failed to parse sync list ID", "err", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	list, err := models.FindSyncListByID(c.Request().Context(), id)
+	list, err := models.FindSyncListByIdWithMailboxes(c.Request().Context(), id)
 	if err != nil {
 		if errorsx.IsNotFoundError(err) {
 			return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
 		}
+
+		slog.Error("failed to find sync list", "err", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserId != helpers.GetUserSessionData(c).ID {
+	if list.UserId != helpers.GetUserSessionData(c).Id {
+		slog.Error("user is not authorized to delete sync list", "err", err)
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	accounts, err := models.FindEmailAccountsBySyncListID(c.Request().Context(), list.Id)
-	if err != nil {
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	mailboxIds := make([]int, len(list.Mailboxes))
+	for i, mailbox := range list.Mailboxes {
+		mailboxIds[i] = mailbox.Id
 	}
 
-	accountIDs := make([]int, len(accounts))
-	for i, account := range accounts {
-		accountIDs[i] = account.Id
-	}
-
-	relatedJobs, err := models.FindJobsByRelatedBulk(c.Request().Context(), "email_accounts", accountIDs)
+	relatedJobs, err := models.FindJobsByManyRelated(c.Request().Context(), "mailboxes", mailboxIds)
 	if err != nil {
+		slog.Error("failed to find related jobs", "err", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
 	for _, job := range relatedJobs {
 		if job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending {
+			slog.Error("job is running or pending", "err", err)
 			return helpers.Render(c, http.StatusConflict, alert.Error(helpers.MsgErrForbidden))
 		}
 	}
 
-	err = models.DeleteSyncListByID(c.Request().Context(), id)
+	err = models.DeleteSyncListById(c.Request().Context(), id)
 	if err != nil {
+		slog.Error("failed to delete sync list", "err", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
@@ -337,33 +318,33 @@ func SyncListDelete(c *echo.Context) error {
 func SyncListDeleteJobs(c *echo.Context) error {
 	id, err := helpers.ParamAsInt(c, "id")
 	if err != nil {
+		slog.Error("failed to parse id", "err", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	list, err := models.FindSyncListByID(c.Request().Context(), id)
+	list, err := models.FindSyncListByIdWithMailboxes(c.Request().Context(), id)
 	if err != nil {
 		if errorsx.IsNotFoundError(err) {
 			return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
 		}
+
+		slog.Error("failed to find sync list", "err", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserId != helpers.GetUserSessionData(c).ID {
+	if list.UserId != helpers.GetUserSessionData(c).Id {
+		slog.Error("user is not authorized to delete sync list", "err", err)
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	accounts, err := models.FindEmailAccountsBySyncListID(c.Request().Context(), list.Id)
-	if err != nil {
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+	mailboxIds := make([]int, len(list.Mailboxes))
+	for i, mailbox := range list.Mailboxes {
+		mailboxIds[i] = mailbox.Id
 	}
 
-	accountIDs := make([]int, len(accounts))
-	for i, account := range accounts {
-		accountIDs[i] = account.Id
-	}
-
-	err = models.DeleteJobsByRelatedBulk(c.Request().Context(), "email_accounts", accountIDs)
+	err = models.DeleteJobsByManyRelated(c.Request().Context(), "mailboxes", mailboxIds)
 	if err != nil {
+		slog.Error("failed to delete jobs", "err", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
@@ -383,98 +364,65 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	userID := helpers.GetUserSessionData(c).ID
+	userId := helpers.GetUserSessionData(c).Id
 
-	list, err := models.FindSyncListByID(ctx, id)
+	list, err := models.FindSyncListByIdWithMailboxes(ctx, id)
 	if err != nil {
 		slog.Debug("Failed to find sync list", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserId != userID {
-		slog.Debug("Unauthorized access attempt", "userID", userID, "listID", id)
+	if list.UserId != userId {
+		slog.Debug("Unauthorized access attempt", "userID", userId, "listID", id)
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	accounts, err := models.FindEmailAccountsBySyncListID(ctx, list.Id)
-	if err != nil {
-		slog.Debug("Failed to find email accounts", "error", err)
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
-	}
-
-	if len(accounts) == 0 {
+	if len(list.Mailboxes) == 0 {
 		return c.NoContent(http.StatusOK)
 	}
 
-	accountIDs := make([]int, len(accounts))
-	for i, account := range accounts {
-		accountIDs[i] = account.Id
+	mailboxIds := make([]int, 0)
+	for _, mailbox := range list.Mailboxes {
+		mailboxIds = append(mailboxIds, mailbox.Id)
 	}
 
-	existingJobs, err := models.FindJobsByRelatedBulk(ctx, "email_accounts", accountIDs)
+	jobsByMailboxId, err := models.FindJobsByManyRelatedMap(ctx, "mailboxes", mailboxIds)
 	if err != nil {
 		slog.Debug("Failed to find existing jobs", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	jobsByAccountID := make(map[int]*models.Job)
-	for _, job := range existingJobs {
-		if _, exists := jobsByAccountID[job.RelatedId]; exists {
-			slog.Error("multiple jobs found for email account", "email_account", job.RelatedId)
-			return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
-		}
-		jobsByAccountID[job.RelatedId] = job
-	}
-
 	jobsToUpdate := make([]*models.Job, 0)
-	newJobPayloads := make([]json.RawMessage, 0)
-	newJobAccountIDs := make([]int, 0)
+	newJobPayloads := make([]*json.RawMessage, 0)
+	newJobMailboxIds := make([]int, 0)
 
-	for _, account := range accounts {
-		job, exists := jobsByAccountID[account.Id]
+	for _, mailboxId := range mailboxIds {
+		relJobs, exists := jobsByMailboxId[mailboxId]
+		if len(relJobs) > 1 {
+			slog.Error("Found multiple jobs for mailbox", "mailbox_id", mailboxId)
+			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
+		}
+
 		if exists {
-			if !(job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending) {
-				payload := new(jobs.MigrateAccount)
-				err := json.Unmarshal(job.Payload, payload)
-				if err != nil {
-					slog.Debug("Failed to unmarshal job payload", "error", err)
-					return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
-				}
-
-				payload.SrcAddr = net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort))
-				payload.DstAddr = net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort))
-				payload.CompareMessageIds = list.CompareMessageIds
-				payload.CompareLastUid = list.CompareLastUid
-
-				json, err := json.Marshal(payload)
-				if err != nil {
-					slog.Debug("Failed to marshal job payload", "error", err)
-					return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
-				}
-
-				job.Payload = json
-				job.Status = models.JobStatusPending
-				jobsToUpdate = append(jobsToUpdate, job)
-			}
+			relJobs[0].Status = models.JobStatusPending
+			now := time.Now()
+			relJobs[0].StartedAt = &now
+			relJobs[0].FinishedAt = nil
+			jobsToUpdate = append(jobsToUpdate, relJobs[0])
 		} else {
-			payload := jobs.NewMigrateAccount(jobs.NewMigrateAccountParams{
-				SrcAddr:           net.JoinHostPort(list.SrcHost, strconv.Itoa(list.SrcPort)),
-				DstAddr:           net.JoinHostPort(list.DstHost, strconv.Itoa(list.DstPort)),
-				SrcUser:           account.SrcUser,
-				SrcPasswordHash:   account.SrcPasswordHash,
-				DstUser:           account.DstUser,
-				DstPasswordHash:   account.DstPasswordHash,
-				CompareMessageIDs: list.CompareMessageIds,
-				CompareLastUid:    list.CompareLastUid,
-			})
+			payload := jobs.MigrateMailboxPayload{
+				SyncListId: list.Id,
+				MailboxId:  mailboxId,
+			}
 
-			data, err := json.Marshal(payload)
+			payloadJson, err := json.Marshal(payload)
 			if err != nil {
-				slog.Debug("Failed to marshal job payload", "error", err)
+				slog.Debug("Failed to marshal payload", "error", err)
 				return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 			}
-			newJobPayloads = append(newJobPayloads, data)
-			newJobAccountIDs = append(newJobAccountIDs, account.Id)
+
+			newJobPayloads = append(newJobPayloads, (*json.RawMessage)(&payloadJson))
+			newJobMailboxIds = append(newJobMailboxIds, mailboxId)
 		}
 	}
 
@@ -486,7 +434,7 @@ func SyncListJobMigrateStart(c *echo.Context) error {
 	}
 
 	if len(newJobPayloads) > 0 {
-		_, err = models.CreateJobsWithRelated(ctx, userID, jobs.MigrateAccountType, newJobPayloads, "email_accounts", newJobAccountIDs)
+		_, err = models.CreateJobsWithRelated(ctx, userId, jobs.MigrateMailboxType, "mailboxes", newJobMailboxIds, newJobPayloads)
 		if err != nil {
 			slog.Debug("Failed to create jobs", "error", err)
 			return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
@@ -503,32 +451,33 @@ func SyncListJobMigrateStop(c *echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	userID := helpers.GetUserSessionData(c).ID
+	userId := helpers.GetUserSessionData(c).Id
 
-	list, err := models.FindSyncListByID(ctx, id)
+	list, err := models.FindSyncListByIdWithMailboxes(c.Request().Context(), id)
 	if err != nil {
+		if errorsx.IsNotFoundError(err) {
+			return helpers.Render(c, http.StatusNotFound, alert.Error(helpers.MsgErrNotFound))
+		}
+
+		slog.Error("Failed to find sync list", "error", err)
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}
 
-	if list.UserId != userID {
+	if list.UserId != userId {
+		slog.Error("Unauthorized access to sync list", "sync_list_id", list.Id, "user_id", userId)
 		return helpers.Render(c, http.StatusForbidden, alert.Error(helpers.MsgErrForbidden))
 	}
 
-	accounts, err := models.FindEmailAccountsBySyncListID(ctx, list.Id)
-	if err != nil {
-		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
-	}
-
-	if len(accounts) == 0 {
+	if len(list.Mailboxes) == 0 {
 		return c.NoContent(http.StatusOK)
 	}
 
-	accountIDs := make([]int, len(accounts))
-	for i, account := range accounts {
-		accountIDs[i] = account.Id
+	mailboxIds := make([]int, len(list.Mailboxes))
+	for i, mailbox := range list.Mailboxes {
+		mailboxIds[i] = mailbox.Id
 	}
 
-	jobs, err := models.FindJobsByRelatedBulk(ctx, "email_accounts", accountIDs)
+	jobs, err := models.FindJobsByManyRelated(ctx, "mailboxes", mailboxIds)
 	if err != nil {
 		return helpers.Render(c, http.StatusInternalServerError, alert.Error(helpers.MsgErrGeneric))
 	}

@@ -8,6 +8,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"log/slog"
+	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,49 +18,23 @@ import (
 	"github.com/emersion/go-imap/client"
 )
 
-var MigrateAccountType models.JobType = "migrate_account"
+var MigrateMailboxType models.JobType = "migrate_account"
 
-type MigrateAccount struct {
-	SrcAddr           string
-	DstAddr           string
-	SrcUser           string
-	SrcPasswordHash   string
-	DstUser           string
-	DstPasswordHash   string
-	CompareMessageIds bool
-	CompareLastUid    bool
-	FolderLastUid     map[string]uint32
-	FolderUidValidity map[string]uint32
+type MigrateMailbox struct {
+	SyncList *models.SyncList
+	Mailbox  *models.Mailbox
 }
 
-type NewMigrateAccountParams struct {
-	SrcAddr           string
-	DstAddr           string
-	SrcUser           string
-	SrcPasswordHash   string
-	DstUser           string
-	DstPasswordHash   string
-	CompareMessageIDs bool
-	CompareLastUid    bool
+type MigrateMailboxPayload struct {
+	SyncListId int `json:"syncListId"`
+	MailboxId  int `json:"mailboxId"`
 }
 
-func NewMigrateAccount(params NewMigrateAccountParams) *MigrateAccount {
-	return &MigrateAccount{
-		SrcAddr:           params.SrcAddr,
-		DstAddr:           params.DstAddr,
-		SrcUser:           params.SrcUser,
-		SrcPasswordHash:   params.SrcPasswordHash,
-		DstUser:           params.DstUser,
-		DstPasswordHash:   params.DstPasswordHash,
-		CompareMessageIds: params.CompareMessageIDs,
-		CompareLastUid:    params.CompareLastUid,
-		FolderLastUid:     make(map[string]uint32),
-		FolderUidValidity: make(map[string]uint32),
-	}
-}
-
-func (j *MigrateAccount) Run(ctx context.Context) (err error) {
+func (j *MigrateMailbox) Run(ctx context.Context) (err error) {
 	slog.Debug("Starting migration")
+
+	srcAddr := net.JoinHostPort(j.SyncList.SrcHost, strconv.Itoa(j.SyncList.SrcPort))
+	dstAddr := net.JoinHostPort(j.SyncList.DstHost, strconv.Itoa(j.SyncList.DstPort))
 
 	var srcClient *client.Client
 	var dstClient *client.Client
@@ -69,14 +45,14 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 	dialWg.Add(2)
 	go func() {
 		defer dialWg.Done()
-		srcClient, srcClientErr = client.DialTLS(j.SrcAddr, nil)
+		srcClient, srcClientErr = client.DialTLS(srcAddr, nil)
 		if srcClient == nil && srcClientErr == nil {
 			srcClientErr = errors.New("source client is nil")
 		}
 	}()
 	go func() {
 		defer dialWg.Done()
-		dstClient, dstClientErr = client.DialTLS(j.DstAddr, nil)
+		dstClient, dstClientErr = client.DialTLS(dstAddr, nil)
 		if dstClient == nil && dstClientErr == nil {
 			dstClientErr = errors.New("destination client is nil")
 		}
@@ -92,7 +68,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 	case <-done:
 		if srcClientErr != nil {
 			slog.Debug("Failed to connect to source server (TLS)", "error", srcClientErr)
-			srcClient, err = client.Dial(j.SrcAddr)
+			srcClient, err = client.Dial(srcAddr)
 			if err != nil {
 				slog.Debug("Failed to connect to source server (no TLS)", "error", err)
 				return err
@@ -111,7 +87,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 
 		if dstClientErr != nil {
 			slog.Debug("Failed to connect to destination server (TLS)", "error", dstClientErr)
-			dstClient, err = client.Dial(j.DstAddr)
+			dstClient, err = client.Dial(dstAddr)
 			if err != nil {
 				slog.Debug("Failed to connect to destination server (no TLS)", "error", err)
 				return err
@@ -139,24 +115,24 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 		return errors.New("dial timeout")
 	}
 
-	decryptedSrcPassword, err := helpers.AesDecrypt(j.SrcPasswordHash, config.Config.AppKey)
+	decryptedSrcPassword, err := helpers.AesDecrypt(j.Mailbox.SrcPasswordHash, config.Config.AppKey)
 	if err != nil {
 		slog.Debug("Failed to decrypt source password", "error", err)
 		return err
 	}
 
-	decryptedDstPassword, err := helpers.AesDecrypt(j.DstPasswordHash, config.Config.AppKey)
+	decryptedDstPassword, err := helpers.AesDecrypt(j.Mailbox.DstPasswordHash, config.Config.AppKey)
 	if err != nil {
 		slog.Debug("Failed to decrypt destination password", "error", err)
 		return err
 	}
 
-	if err := srcClient.Login(j.SrcUser, decryptedSrcPassword); err != nil {
+	if err := srcClient.Login(j.Mailbox.SrcUser, decryptedSrcPassword); err != nil {
 		slog.Debug("Failed to login to source account", "error", err)
 		return err
 	}
 
-	if err := dstClient.Login(j.DstUser, decryptedDstPassword); err != nil {
+	if err := dstClient.Login(j.Mailbox.DstUser, decryptedDstPassword); err != nil {
 		slog.Debug("Failed to login to destination account", "error", err)
 		return err
 	}
@@ -191,15 +167,15 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			return err
 		}
 
-		if j.FolderUidValidity[folderName] == 0 || j.FolderUidValidity[folderName] != srcFolder.UidValidity {
-			j.FolderUidValidity[folderName] = srcFolder.UidValidity
-			j.FolderLastUid[folderName] = 0
+		if j.Mailbox.FolderUidValidity[folderName] == 0 || j.Mailbox.FolderUidValidity[folderName] != srcFolder.UidValidity {
+			j.Mailbox.FolderUidValidity[folderName] = srcFolder.UidValidity
+			j.Mailbox.FolderLastUid[folderName] = 0
 		}
 
 		criteria := imap.NewSearchCriteria()
-		if j.CompareLastUid {
+		if j.SyncList.CompareLastUid {
 			criteria.Uid = &imap.SeqSet{}
-			criteria.Uid.AddRange(j.FolderLastUid[folderName]+1, 4294967295)
+			criteria.Uid.AddRange(j.Mailbox.FolderLastUid[folderName]+1, 4294967295)
 		}
 
 		uids, err := srcClient.Search(criteria)
@@ -240,12 +216,12 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 			default:
 			}
 
-			if j.CompareLastUid && msg.Uid <= j.FolderLastUid[folderName] {
+			if j.SyncList.CompareLastUid && msg.Uid <= j.Mailbox.FolderLastUid[folderName] {
 				slog.Debug("Message Uid is less than or equal to last UID", "messageID", msg.Envelope.MessageId)
 				continue
 			}
 
-			if j.CompareMessageIds {
+			if j.SyncList.CompareMessageIds {
 				dstCriteria := imap.NewSearchCriteria()
 				dstCriteria.Header.Set("Message-ID", msg.Envelope.MessageId)
 				dstCriteria.WithoutFlags = []string{"\\Deleted"}
@@ -292,7 +268,7 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 				if err != nil {
 					return err
 				}
-				j.FolderLastUid[folderName] = uid
+				j.Mailbox.FolderLastUid[folderName] = uid
 			case <-ctx.Done():
 				return ctx.Err()
 			}
@@ -307,6 +283,15 @@ func (j *MigrateAccount) Run(ctx context.Context) (err error) {
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+
+	return nil
+}
+
+func (j *MigrateMailbox) OnStop(ctx context.Context) error {
+	err := models.UpdateMailbox(ctx, j.Mailbox)
+	if err != nil {
+		return err
 	}
 
 	return nil

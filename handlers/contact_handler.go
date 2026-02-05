@@ -4,7 +4,7 @@ import (
 	"app/config"
 	"app/helpers"
 	"app/templates/components/alert"
-	"app/templates/pages"
+	"app/templates/pages/base"
 	"fmt"
 	"net/http"
 
@@ -13,7 +13,7 @@ import (
 )
 
 func ContactShow(c *echo.Context) error {
-	return helpers.Render(c, http.StatusOK, pages.Contact(pages.ContactProps{}))
+	return helpers.Render(c, http.StatusOK, base.Contact(base.ContactProps{}))
 }
 
 func ContactSend(c *echo.Context) error {
@@ -24,7 +24,7 @@ func ContactSend(c *echo.Context) error {
 
 	err := helpers.BindAndValidate(c, &req)
 	if err != nil {
-		return helpers.RenderFragment(c, http.StatusBadRequest, "form", pages.Contact(pages.ContactProps{
+		return helpers.RenderFragment(c, http.StatusBadRequest, "form", base.Contact(base.ContactProps{
 			Values: helpers.FormatValues(c),
 			Errors: helpers.FormatErrors(err),
 		}))
@@ -41,7 +41,7 @@ func ContactSend(c *echo.Context) error {
 
 	err = dialer.DialAndSend(message)
 	if err != nil {
-		return helpers.RenderFragment(c, http.StatusBadRequest, "form", pages.Contact(pages.ContactProps{
+		return helpers.RenderFragment(c, http.StatusBadRequest, "form", base.Contact(base.ContactProps{
 			Values: helpers.FormatValues(c),
 			Errors: helpers.FormatErrors(err),
 		}))
