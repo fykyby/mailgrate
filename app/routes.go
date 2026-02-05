@@ -3,7 +3,7 @@ package app
 import (
 	"app/handlers"
 	"app/helpers"
-	"app/templates/pages"
+	"app/templates/pages/base"
 	"net/http"
 
 	middlewarex "app/middleware"
@@ -15,7 +15,7 @@ func RegisterRoutes(e *echo.Echo) {
 	aa := e.Group("")
 	aa.Use(middlewarex.WithAuthAny)
 	aa.GET("/", func(c *echo.Context) error {
-		return helpers.Render(c, http.StatusOK, pages.Home())
+		return helpers.Render(c, http.StatusOK, base.Home())
 	})
 	aa.GET("/password-reset", handlers.UserShowRequestPasswordReset)
 	aa.POST("/password-reset", handlers.UserRequestPasswordReset)

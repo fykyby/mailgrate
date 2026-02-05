@@ -10,33 +10,29 @@ import (
 
 var ExampleType models.JobType = "example"
 
-type Example struct {
-	Count int
-}
+type Example struct{}
 
 func NewExample() *Example {
-	return &Example{
-		Count: 0,
-	}
+	return &Example{}
 }
 
 func (j *Example) Run(ctx context.Context) error {
-	for {
+	for i := range 10 {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		j.Count++
-		slog.Info(fmt.Sprintf("count: %d", j.Count))
+		slog.Info(fmt.Sprintf("count: %d", i))
 
 		time.Sleep(time.Second)
 
-		if j.Count >= 20 {
-			break
-		}
 	}
 
+	return nil
+}
+
+func (j *Example) OnStop(ctx context.Context, err error) error {
 	return nil
 }

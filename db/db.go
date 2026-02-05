@@ -5,7 +5,6 @@ import (
 	"app/config"
 	"database/sql"
 	"log/slog"
-	"os"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -20,7 +19,7 @@ func InitPostgresDatabase() {
 	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.Config.DatabaseURL)))
 	Bun = bun.NewDB(sqldb, pgdialect.New())
 
-	if os.Getenv("ENV") != "dev" {
+	if !config.Config.Debug {
 		Migrate()
 	}
 }
