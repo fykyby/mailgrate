@@ -25,15 +25,15 @@ type runningJob struct {
 	Cancel  context.CancelFunc
 }
 
-type jobFactory func(ctx context.Context, payload *json.RawMessage) (JobHandler, error)
+type JobFactory func(ctx context.Context, payload *json.RawMessage) (JobHandler, error)
 
 var runningJobs = map[int]*runningJob{}
 var runningJobsMu sync.Mutex
 
 // Immutable after app.RegisterJobs()
-var jobHandlerRegistry = make(map[models.JobType]jobFactory)
+var jobHandlerRegistry = make(map[models.JobType]JobFactory)
 
-func RegisterJob(jobType models.JobType, factory jobFactory) {
+func RegisterJob(jobType models.JobType, factory JobFactory) {
 	jobHandlerRegistry[jobType] = factory
 }
 

@@ -4,8 +4,10 @@ import (
 	"app/config"
 	"app/helpers"
 	"app/models"
+	"app/worker"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net"
@@ -28,6 +30,32 @@ type MigrateMailbox struct {
 type MigrateMailboxPayload struct {
 	SyncListId int `json:"syncListId"`
 	MailboxId  int `json:"mailboxId"`
+}
+
+func MigrateMailboxFactory(ctx context.Context, payload *json.RawMessage) (worker.JobHandler, error) {
+	migrateMailboxPayload := new(MigrateMailboxPayload)
+
+	err := json.Unmarshal(*payload, migrateMailboxPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	list, err := models.FindSyncListById(ctx, migrateMailboxPayload.SyncListId)
+	if err != nil {
+		return nil, err
+	}
+
+	mailbox, err := models.FindMailboxById(ctx, migrateMailboxPayload.MailboxId)
+	if err != nil {
+		return nil, err
+	}
+
+	handler := &MigrateMailbox{
+		SyncList: list,
+		Mailbox:  mailbox,
+	}
+
+	return handler, nil
 }
 
 func (j *MigrateMailbox) Run(ctx context.Context) (err error) {
